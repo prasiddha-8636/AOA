@@ -86,7 +86,7 @@ def measure_throughput(model, seq_len, batch_size, device, n_warmup=10, n_iters=
 
 
 def profile_all_methods(device="cuda"):
-    from src.config import ALL_METHODS
+    from src.config import ALL_METHODS  # now defined in config.py
 
     results = {}
     for method in ALL_METHODS:

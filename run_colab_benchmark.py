@@ -19,6 +19,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 from src.config import BenchmarkConfig, MODELS_TO_EVAL
 from src.evaluate import run_full_model_eval
+from src.plotting import plot_all
 
 
 def run_all_benchmarks():
@@ -62,6 +63,11 @@ def run_all_benchmarks():
         row_str = f"{res['model_name']:<25} | "
         row_str += " | ".join([f"{str(res['perplexity'].get(L, 'N/A')):<6}" for L in cfg.eval_lengths])
         print(row_str)
+
+    try:
+        plot_all(all_results)
+    except Exception as e:
+        print(f"Plotting failed (results JSON is still saved): {e}")
 
 
 if __name__ == "__main__":
