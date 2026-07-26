@@ -1,0 +1,37 @@
+methods:
+  - learned
+  - sinusoidal
+  - rope
+  - alibi
+  - nope
+  - kerple
+  - cable
+  - position_interpolation  # fine-tuned from rope
+
+model:
+  d_model: 768
+  n_layers: 12
+  n_heads: 12
+  d_ff: 3072
+  dropout: 0.1
+  activation: gelu
+  norm_first: true
+
+training:
+  total_steps: 100000
+  batch_size: 64
+  learning_rate: 0.0003
+  warmup_steps: 2000
+  weight_decay: 0.1
+  grad_clip: 1.0
+
+evaluation:
+  lengths: [512, 1024, 2048, 4096, 8192]
+  needle_depths: [0.25, 0.50, 0.75, 0.90]
+  arithmetic_max_digits: 10
+  multi_hop_samples: 100
+
+profiling:
+  flops: true
+  throughput: true
+  memory: true

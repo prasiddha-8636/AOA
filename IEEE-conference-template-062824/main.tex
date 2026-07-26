@@ -1,0 +1,266 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{forest}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125em}}
+
+\begin{document}
+
+\title{A Comparative Study of Positional Encoding Methods for Length Extrapolation}
+
+\author{
+\IEEEauthorblockN{Prasiddha Raj Poudel}
+\IEEEauthorblockA{
+Department of Electronics and Computer Engineering\\
+Thapathali Campus, Tribhuvan University\\
+Kathmandu, Nepal\\
+prasiddha.080bct027@tcioe.edu.np
+}
+}
+
+\maketitle
+
+\begin{abstract}
+Transformer models rely on self-attention to process input sequences. Self-attention does not preserve token order, so positional encoding supplies sequence information during training and inference. The choice of positional encoding determines how well a model generalizes to sequence lengths beyond its training window. This paper presents an ongoing comparative study of three primary positional encoding paradigms: Learned Absolute Positional Embedding, Rotary Positional Encoding (RoPE), and Attention with Linear Biases (ALiBi). We review the theoretical background of each method and design a lightweight zero-shot evaluation benchmark executable on free-tier computing hardware (Google Colab T4 GPU). This paper outlines our research framework, initial literature findings, and ongoing evaluation protocol for measuring length extrapolation, retrieval accuracy, and inference overhead.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Transformer, Positional Encoding, Length Extrapolation, Self-Attention, RoPE, ALiBi, Work in Progress
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Transformer architectures have become the standard foundation for natural language processing \cite{vaswani2017,touvron2023}. Their primary strength lies in self-attention, which models dependencies across sequence tokens. However, self-attention alone is permutation-invariant. A transformer treats input tokens as an unordered set unless explicit positional information is provided \cite{vaswani2017}.
+
+Positional encodings solve this by assigning position representations to tokens. Early models used absolute encodings, such as fixed sinusoidal functions or learned position embeddings \cite{vaswani2017,devlin2019,radford2019}. While effective within the training window, absolute encodings degrade rapidly when evaluating sequences longer than those seen during training \cite{press2022}.
+
+To solve this length extrapolation problem, recent architectures use relative rotations or attention score biases. Rotary Positional Encoding (RoPE) rotates query and key vectors in complex space \cite{su2024roformer}, while Attention with Linear Biases (ALiBi) adds distance-based penalties directly to attention logits \cite{press2022}.
+
+This paper documents an ongoing comparative study evaluating Learned Absolute embeddings, RoPE, and ALiBi. Because training large models from scratch requires prohibitive computing resources, we design a doable, zero-shot evaluation methodology to test open-weight models (GPT-2, Pythia, OPT) on Google Colab free-tier hardware.
+
+The contributions of this work-in-progress paper are:
+\begin{itemize}
+\item A structured review of absolute, rotary, and bias-based positional encoding paradigms.
+\item A practical, resource-constrained evaluation methodology for testing length extrapolation, retrieval depth, and inference efficiency.
+\item An analysis framework comparing positional inductive biases across pre-trained language model checkpoints.
+\end{itemize}
+
+\section{Literature Review}
+\label{sec:literature}
+
+Research on positional encoding has progressed from absolute representations to methods designed specifically for long-context inference. Early approaches focused on learning positional information within a fixed context window. Later work shifted toward preserving attention stability beyond the training length. Figure~\ref{fig:taxonomy} introduces the hierarchical structure of these paradigms, following the taxonomy proposed in a recent survey that organizes positional encoding research explicitly around length extrapolation \cite{zhao2024survey}.
+
+Rather than describing each method in isolation, this section compares methods directly along five practical axes that determine whether a positional encoding is suitable for a given deployment: zero-shot extrapolation capability, fine-tuning requirements, recency bias, long-range retrieval capability, and computational/implementation cost. These axes recur throughout the literature as the actual deciding factors when a practitioner chooses a positional encoding, so they are used here as the organizing structure instead of a chronological list of methods.
+
+\begin{figure*}[htbp]
+\centering
+\footnotesize
+\begin{forest}
+for tree={
+  parent anchor=south,
+  child anchor=north,
+  align=center,
+  edge={-latex},
+  s sep+=6pt,
+  l sep+=14pt,
+  inner sep=2pt,
+  edge path={
+    \noexpand\path[\forestoption{edge}]
+      (!u.parent anchor) -- +(0,-4pt) -| (.child anchor)\forestoption{edge label};
+  },
+}
+[Positional Encoding
+  [Absolute
+    [Sinusoidal]
+    [Learned]
+  ]
+  [Relative
+    [Shaw]
+    [T5]
+  ]
+  [Rotary
+    [RoPE]
+    [Position\\Interpolation]
+    [YaRN]
+    [Frequency\\Scaling]
+  ]
+  [Bias-based
+    [ALiBi]
+    [KERPLE]
+  ]
+  [Implicit /\\Augmented
+    [NoPE]
+    [Randomized\\PE]
+  ]
+]
+\end{forest}
+\caption{A taxonomy of positional encoding methods for Transformer models.}
+\label{fig:taxonomy}
+\end{figure*}
+
+\subsection{Zero-Shot Extrapolation Capability}
+
+Zero-shot extrapolation is the ability of a model to process sequences longer than its training length without any additional training. The methods reviewed differ sharply on this axis. Learned absolute embeddings cannot extrapolate at all: positions beyond the training range have no corresponding embedding, so BERT and GPT-2 style models simply have nothing to look up \cite{devlin2019,radford2019,press2022}. Sinusoidal encoding is defined analytically for any position, but this does not translate into extrapolation in practice, since models rarely learn the underlying rotational structure well enough to generalize past the training window \cite{vaswani2017,press2022}.
+
+Relative encodings extrapolate better because they depend on token distance rather than absolute index. Shaw et al.'s relative representations, Transformer-XL, and T5's bucketed biases clip or bucket distances, keeping position representations bounded \cite{shaw2018,dai2019,raffel2020,press2022}. RoPE improves on this further: because attention depends on the rotation difference between query and key, RoPE extrapolates better than absolute encodings out of the box, though high-frequency dimensions still oscillate unpredictably at long distances \cite{su2024roformer,sun2022lex}.
+
+ALiBi and KERPLE currently give the strongest zero-shot extrapolation among the methods compared here, since their bias term is a fixed function of distance that is well-defined at any length, with no positions to learn \cite{press2022,chi2022}. BiPE reaches a similar result from a different angle: by explicitly separating an intra-segment absolute encoding from an inter-segment relative encoding, the inter-segment component alone carries the burden of extrapolation, which the authors show improves zero-shot length generalization across text, code, and math domains \cite{he2024bipe}. At the extreme, NoPE removes explicit positional machinery entirely and relies on the causal mask, occasionally outperforming ALiBi, RoPE, and learned absolute encodings on length generalization tasks, which suggests that stable attention behavior, not the specific encoding mechanism, is the more fundamental driver of extrapolation \cite{kazemnejad2023}. A broad survey of this literature confirms the same ordering across many models: relative encodings consistently extrapolate better than absolute ones because of their shift-invariance and distance-decay properties \cite{zhao2024survey}.
+
+\subsection{Fine-Tuning Requirements}
+
+A second axis is whether a method extrapolates without any further training (plug-and-play) or needs fine-tuning to work at longer lengths. Absolute embeddings sit at one extreme: they cannot be extended at all without retraining or adding new embeddings \cite{press2022}. ALiBi and KERPLE sit at the other extreme: since the bias function has no learned per-position parameters, no fine-tuning is required to run at a longer length, though the bias itself is chosen at pretraining time \cite{press2022,chi2022}.
+
+RoPE-extension methods split along this axis. Position Interpolation compresses position indices into the pretraining range and needs brief fine-tuning to realign attention distributions \cite{chen2023}. NTK-aware and Dynamic-NTK scaling modify the RoPE base directly and were designed specifically to avoid this fine-tuning step, at some cost in extrapolation quality \cite{zhao2024survey}. YaRN combines frequency-selective interpolation with a softmax temperature adjustment and needs substantially fewer fine-tuning steps than Position Interpolation to reach comparable or better results \cite{peng2023yarn}. LongRoPE2 pushes this further: it identifies insufficient training in the higher RoPE dimensions as the cause of the residual out-of-distribution behavior left by earlier scaling methods, and uses an evolutionary search over the rescaling factors followed by a short mixed context-window fine-tuning pass to recover near-lossless short-context performance while extending the window \cite{shang2025longrope2}. Randomized positional encodings and PoSE fall into the same category: they require exposing the model to randomized or skipped position indices during training or fine-tuning so that the full range of positions is seen in advance \cite{ruoss2023,zhao2024survey}. CABLE, in contrast, is trained end to end from scratch, so it is best understood as a design choice made before pretraining, like ALiBi, rather than a post-hoc extension applied to an existing checkpoint \cite{veisi2025cable}.
+
+\subsection{Recency Bias}
+
+ALiBi and KERPLE achieve their extrapolation by explicitly penalizing distance: attention scores are reduced in proportion to how far apart two tokens are, which produces a strong recency bias by construction \cite{press2022,chi2022}. RoPE does not impose an explicit distance penalty, but long-term decay still emerges from the superposition of rotations across dimensions, giving it a milder and less predictable recency bias than ALiBi \cite{su2024roformer,sun2022lex}. Learned absolute embeddings and NoPE have no explicit recency mechanism at all, but this is not an advantage in practice since neither extrapolates reliably in the first place \cite{press2022,kazemnejad2023}.
+
+CABLE targets this trade-off directly. Instead of a fixed global slope per head, it learns token-specific, context-aware biases that adjust based on the input rather than imposing a uniform decay with distance \cite{veisi2025cable}. On GPT-2 Medium, this reduces perplexity relative to RoPE, ALiBi, and T5-style bias at sequence lengths beyond training, which suggests that making the bias content-dependent rather than purely distance-dependent can soften the recency bias without discarding its extrapolation benefit. This result currently comes from a single paper at a moderate model scale, so it should be read as a promising direction rather than an established conclusion.
+
+\subsection{Long-Range Retrieval Capability}
+
+Long-range retrieval capability is the mirror image of recency bias: a method that suppresses distant tokens too aggressively will struggle whenever the correct answer depends on information far back in the context. ALiBi and KERPLE's recency bias creates exactly this failure mode in long-range multi-hop retrieval tasks, since distant token associations are precisely what the linear or kernelized penalty suppresses \cite{press2022,chi2022}. RoPE preserves long-range signal better because it does not hard-penalize distance, but the phase-shifting instability in its high-frequency dimensions still degrades retrieval at very long ranges \cite{sun2022lex,chen2023}.
+
+BiPE's inter-segment relative encoding is designed to preserve cross-segment structure specifically so that relationships between distant segments remain modeled rather than discarded, which the authors report improves length extrapolation across diverse tasks \cite{he2024bipe}. CABLE's content-conditioned bias offers a similar improvement in principle, since a bias that depends on what the tokens are rather than only how far apart they are is less likely to discard a relevant distant token by default \cite{veisi2025cable}. It is also worth noting that commonly used long-context evaluations such as the Needle-in-a-Haystack test only require locating one distinctive fact rather than integrating information across the full context, so they may overstate a method's real long-range retrieval capability \cite{zhao2024survey}.
+
+\subsection{Computational and Implementation Cost}
+
+Sinusoidal encoding has zero parameter overhead and uses static trigonometric computation. Learned absolute embeddings add parameters proportional to the maximum context length but only require a table lookup at runtime. Shaw's relative representations compute pairwise offset vectors, which scales poorly in memory; T5's bucketing reduces this by mapping offsets to scalar buckets at the cost of an extra indexing step \cite{shaw2018,raffel2020}.
+
+RoPE rotates queries and keys with an element-wise operation, adding negligible latency and zero extra parameters \cite{su2024roformer}. ALiBi is even cheaper, applying a static bias addition directly to attention scores with no learned parameters \cite{press2022}. KERPLE and CABLE trade some of this simplicity for flexibility: KERPLE introduces a small number of kernel parameters per head, and CABLE's context-aware bias requires a lightweight per-head network to produce token-specific biases, which is more expensive than ALiBi's fixed slope but still far cheaper than a full attention layer \cite{chi2022,veisi2025cable}. Position Interpolation, YaRN, and frequency rescaling preserve the runtime cost profile of the base RoPE model, since they only change how position indices or the rotary base are computed \cite{chen2023,peng2023yarn,liu2024scaling}. LongRoPE2 adds a one-time evolutionary search cost during setup but does not increase the per-token runtime cost of the resulting model \cite{shang2025longrope2}.
+
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Theoretical Framework and Justification}
+
+Self-attention compares query and key vectors using similarity scores. Without explicit positional encoding, self-attention treats inputs as unordered sets \cite{vaswani2017}. Positional encodings break this symmetry by injecting position information into the attention computation. The design of a positional encoding determines how well the attention mechanism generalizes when input length exceeds the training context window.
+
+We evaluate three core paradigms representing modern language model architectures:
+\begin{enumerate}
+\item \textbf{Learned Absolute}: Embedding vectors added to input tokens (e.g., GPT-2).
+\item \textbf{Rotary (RoPE)}: Complex rotations applied directly to query and key vectors \cite{su2024roformer} (e.g., Pythia, Qwen).
+\item \textbf{Linear Biases (ALiBi)}: Distance penalties added directly to attention logits \cite{press2022} (e.g., OPT, BLOOM).
+\end{enumerate}
+Comparing these three paradigms isolates how position mechanics affect context length extrapolation.
+
+\subsection{Research Design}
+
+We use an empirical zero-shot evaluation design. Training large transformer models from scratch requires extensive GPU hardware beyond typical computing constraints. Instead, we evaluate pre-trained open-weight models representing each paradigm on a single Google Colab free-tier T4 GPU.
+
+We execute forward-pass evaluations across sequence lengths $L \in \{512, 1024, 2048, 4096, 8192\}$ across three tasks:
+\begin{enumerate}
+\item \textbf{Perplexity Extrapolation}: Measure language modeling perplexity on long-form text as sequence length scales.
+\item \textbf{Needle-in-a-Haystack Retrieval}: Measure retrieval accuracy when target keys are placed at context depths of 25\%, 50\%, 75\%, and 90\%.
+\item \textbf{Inference Overhead}: Track peak GPU VRAM footprint (MB) and per-token latency (ms/token) across context lengths.
+\end{enumerate}
+
+\subsection{Data Collection Procedure}
+
+Models are evaluated on two datasets:
+\begin{enumerate}
+\item \textbf{PG-19 Test Set}: Long-form book text split into evaluation context blocks up to 8,192 tokens.
+\item \textbf{Synthetic Needle Task}: Synthetically generated documents containing key-value passcodes inserted at controlled depth ratios.
+\end{enumerate}
+Pre-trained model weights are retrieved directly from Hugging Face Hub: GPT-2 (\texttt{gpt2}, 124M) for Learned Absolute, Pythia (\texttt{EleutherAI/pythia-160m}) for RoPE, and OPT (\texttt{facebook/opt-350m}) for ALiBi.
+
+\subsection{Data Processing and Analysis Tools}
+
+All benchmarks execute in Python using PyTorch and Hugging Face \texttt{transformers} under zero-shot inference (\texttt{torch.no_grad()}). Perplexity is calculated using sliding-window cross-entropy loss. Peak GPU memory is recorded via \texttt{torch.cuda.max\_memory\_allocated()}. Results are compiled into comparative tables and performance scaling plots using Matplotlib.
+
+\section{Comparative Analysis}
+\label{sec:comparison}
+
+The positional encoding methods reviewed in Section \ref{sec:literature} exhibit distinct trade-offs in representation strategy, parameter efficiency, and extrapolation capability. A systematic comparison of these paradigms reveals how structural design choices directly influence inference stability at extended context boundaries. Table~\ref{tab:comparison} summarizes the major characteristics of the positional encoding methods reviewed in this paper.
+
+\begin{table*}[!t]
+\caption{Comparison of Major Positional Encoding Methods}
+\label{tab:comparison}
+\centering
+\begin{tabular}{lccccc}
+\hline
+\textbf{Method} & \textbf{Position Type} & \textbf{Extrapolation} & \textbf{Extra Parameters} & \textbf{Complexity} & \textbf{Representative Models} \\
+\hline
+Sinusoidal & Absolute & Low & No & Low & Transformer \\
+Learned & Absolute & Poor & Yes & Low & BERT \\
+Shaw & Relative & Medium & Yes & Medium & Transformer \\
+T5 & Relative & Medium & Yes & Medium & T5 \\
+RoPE & Rotary & High & No & Low & LLaMA \\
+ALiBi & Linear Bias & High & No & Very Low & Research \\
+PI & RoPE Extension & Very High & No & Low & Long-context LLMs \\
+YaRN & RoPE Extension & Very High & No & Low & LLaMA \\
+Frequency Rescaling & RoPE Extension & Very High & No & Moderate & Long-context LLMs \\
+KERPLE & Kernelized Bias & High & Yes & Moderate & Research \\
+NoPE & Implicit & Medium--High & No & Very Low & Research (decoder-only) \\
+Randomized PE & Absolute (Randomized) & High & No & Low & Research \\
+\hline
+\end{tabular}
+\end{table*}
+
+\subsection{Length Extrapolation Performance}
+
+Length extrapolation measures how well a transformer processes input sequences longer than those observed during training. Absolute encodings suffer from severe performance drops; learned embeddings restrict the model to a hard-coded coordinate limit, while sinusoidal encodings fail because out-of-distribution coordinate values disrupt learned attention dynamics \cite{press2022}. Relative frameworks like Shaw's relative representation and T5's bucketed biases offer better translation invariance across moderate context expansions, though bucket boundaries eventually collapse under extreme limits \cite{shaw2018,raffel2020}.
+
+RoPE achieves stronger extrapolation than absolute encodings because relative distance remains encoded as continuous vector rotations during query-key interactions \cite{su2024roformer}. However, high-frequency rotary dimensions exhibit phase-shifting instability over long ranges. Position Interpolation resolves this constraint by compressing coordinates into the pretraining coordinate boundaries, which requires brief fine-tuning to realign attention distributions \cite{chen2023}. YaRN and frequency rescaling optimize this compression by selectively scaling low- and high-frequency components, preventing local attention degradation and minimizing the computation needed for post-training adaptation \cite{peng2023yarn,liu2024scaling}.
+
+In contrast, ALiBi bypasses token embedding modifications entirely. Linear attention bias improves extrapolation by adding distance-based penalties directly to attention logits, ensuring stable softmax behavior across arbitrary sequence lengths \cite{press2022}. This approach, however, induces a strict recency bias that can hinder performance in long-range multi-hop retrieval tasks where distant token associations are critical. Similarly, KERPLE leverages kernelized decays to optimize these distance-based penalties, balancing decay rate flexibility with mathematical stability \cite{chi2022}.
+
+A more surprising result comes from models that omit explicit positional encoding entirely. Because decoder-only architectures can implicitly recover ordering information from causal masking alone, Kazemnejad et al. found that NoPE outperforms ALiBi, RoPE, and learned absolute encodings on several downstream length-generalization tasks despite introducing no additional parameters or computation \cite{kazemnejad2023}. This finding suggests that explicit positional machinery, while useful, is not strictly necessary for length generalization in causal transformers, and that attention stability rather than the specific encoding mechanism may be the more fundamental driver of extrapolation performance.
+
+\subsection{Computational Cost}
+
+Evaluating computational overhead requires analyzing training parameters, execution latency, and memory footprints. Sinusoidal encodings demand zero parameter overhead and rely on static trigonometric computations during sequence initialization. Learned absolute embeddings introduce parameters proportional to the context limit but maintain negligible runtime overhead via direct table lookups.
+
+Relative techniques increase calculation complexity. Shaw's relative representations require calculating pairwise offset vectors, which scales poorly in memory usage. T5 relative bias minimizes this constraint by mapping offsets to scalar buckets, though index bucketing still adds operational overhead before self-attention calculation.
+
+RoPE rotates query and key vectors using element-wise multiplication, introducing negligible processing latency while keeping additional parameter counts at zero \cite{su2024roformer}. Linear attention bias improves extrapolation while maintaining extremely low implementation complexity, as static matrix additions are applied directly to raw attention scores. Position Interpolation, YaRN, and frequency rescaling preserve the computational profile of their base rotary models, requiring no changes to the self-attention kernel architecture.
+
+\subsection{Practical Considerations}
+
+Practical selection depends on model lifecycle constraints, particularly the cost of pretraining. RoPE currently serves as the default option for modern open-source foundations like LLaMA because of its balance of zero parameter overhead and high contextual representation capacity \cite{touvron2023}. Consequently, post-training methods like YaRN and Position Interpolation are widely adopted to extend existing rotary checkpoints without restarting pretraining.
+
+ALiBi presents a highly effective alternative when training new architectures from scratch. Linear attention bias simplifies implementation and provides robust extrapolation out-of-the-box, though integrating it into existing rotary-based models is impractical due to weights incompatibility. For systems requiring strict mathematical guarantees on position decay, kernelized options like KERPLE provide continuous relative representations, whereas randomized positional encodings offer an inexpensive training-time modification to make standard architectures length-agnostic.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper presented a comparative study of positional encoding methods designed for length extrapolation in transformer architectures. We structured the major approaches into absolute, relative, rotary, and bias-based paradigms. The review traced the evolution from early static sinusoidal vectors to modern continuous rotations and attention-level distance penalties, illustrating how each architectural design represents sequence ordering.
+
+Our comparison highlights that absolute embeddings fail to generalize beyond pretraining limits. Relative and bias-based techniques, such as T5 and ALiBi, achieve robust length extrapolation but introduce operational overhead or strict recency biases that can degrade long-range dependency retrieval. Rotary positional representations and their recent post-training scaling variants currently offer the most effective path for extending context windows in massive language models, balancing computational efficiency with performance preservation.
+
+Future research directions should focus on addressing the trade-offs of existing scaling techniques, particularly by investigating hybrid encodings that combine relative coordinate properties with implicit positional indicators. Additionally, further studies are needed to evaluate length generalization in non-causal attention models and to establish unified, downstream task-based benchmarks that look beyond simple perplexity evaluations.
+
+\begin{thebibliography}{00}
+\bibitem{vaswani2017} A. Vaswani et al., ``Attention is all you need,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2017, pp. 5998--6008.
+\bibitem{touvron2023} H. Touvron et al., ``Llama: Open and efficient foundation language models,'' \emph{arXiv preprint arXiv:2302.13971}, 2023.
+\bibitem{devlin2019} J. Devlin, M. W. Chang, K. Lee, and K. Toutanova, ``BERT: Pre-training of deep bidirectional transformers for language understanding,'' in \emph{Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL-HLT)}, 2019, pp. 4171--4186.
+\bibitem{radford2019} A. Radford, J. Wu, R. Child, D. Luan, D. Amodei, and I. Sutskever, ``Language models are unsupervised multitask learners,'' \emph{OpenAI blog}, vol. 1, no. 8, p. 9, 2019.
+\bibitem{press2022} O. Press, N. A. Smith, and M. Lewis, ``Train short, test long: Attention with linear biases enables input length extrapolation,'' in \emph{International Conference on Learning Representations (ICLR)}, 2022.
+\bibitem{raffel2020} C. Raffel et al., ``Exploring the limits of transfer learning with a unified text-to-text transformer,'' \emph{Journal of Machine Learning Research}, vol. 21, no. 140, pp. 1--67, 2020.
+\bibitem{shaw2018} P. Shaw, J. Uszkoreit, and A. Vaswani, ``Self-attention with relative position representations,'' in \emph{Proceedings of the 2018 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL-HLT)}, 2018, pp. 464--468.
+\bibitem{dai2019} Z. Dai, Z. Yang, Y. Yang, J. Carbonell, Q. V. Le, and R. Salakhutdinov, ``Transformer-XL: Attentive language models beyond a fixed-length context,'' in \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (ACL)}, 2019, pp. 2978--2988.
+\bibitem{su2024roformer} J. Su, Y. Lu, S. Pan, A. Murtadha, B. Wen, and Y. Liu, ``RoFormer: Enhanced Transformer with Rotary Position Embedding,'' \emph{Neurocomputing}, vol. 568, p. 127063, 2024.
+\bibitem{chen2023} S. Chen et al., ``Extending context window of large language models via positional interpolation,'' \emph{arXiv preprint arXiv:2306.15595}, 2023.
+\bibitem{liu2024scaling} X. Liu, H. Yan, S. Zhang, C. An, X. Qiu, and D. Lin, ``Scaling Laws of RoPE-based Extrapolation,'' in \emph{International Conference on Learning Representations (ICLR)}, 2024.
+\bibitem{peng2023yarn} B. Peng, J. Quesnelle, H. Fan, and E. Shippole, ``YaRN: Efficient Context Window Extension of Large Language Models,'' \emph{arXiv preprint arXiv:2309.00071}, 2023.
+\bibitem{sun2022lex} Y. Sun, L. Dong, B. Patra, S. Ma, S. Huang, A. Benhaim, V. Chaudhary, X. Song, and F. Wei, ``A Length-Extrapolatable Transformer,'' \emph{arXiv preprint arXiv:2212.10554}, 2022.
+\bibitem{kazemnejad2023} A. Kazemnejad, I. Padhi, K. Natesan Ramamurthy, P. Das, and S. Reddy, ``The Impact of Positional Encoding on Length Generalization in Transformers,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2023.
+\bibitem{ruoss2023} A. Ruoss, G. Del\'{e}tang, T. Genewein, J. Grau-Moya, R. Csord\'{a}s, M. Bennani, S. Legg, and J. Veness, ``Randomized Positional Encodings Boost Length Generalization of Transformers,'' in \emph{Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)}, 2023, pp. 1889--1903.
+\bibitem{chi2022} T.-C. Chi, T.-H. Fan, P. Ramadge, and A. Rudnicky, ``KERPLE: Kernelized Relative Positional Embedding for Length Extrapolation,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2022.
+\bibitem{zhao2024survey} L. Zhao, X. Feng, X. Feng, W. Zhong, D. Xu, Q. Yang, H. Liu, B. Qin, and T. Liu, ``Length Extrapolation of Transformers: A Survey from the Perspective of Positional Encoding,'' in \emph{Findings of the Association for Computational Linguistics: EMNLP 2024}, 2024, pp. 9959--9977.
+\bibitem{veisi2025cable} A. Veisi, H. Amirzadeh, and A. Mansourian, ``Context-aware Biases for Length Extrapolation,'' \emph{arXiv preprint arXiv:2503.08067}, 2025.
+\bibitem{shang2025longrope2} N. Shang, L. L. Zhang, S. Wang, G. Zhang, G. Lopez, F. Yang, W. Chen, and M. Yang, ``LongRoPE2: Near-Lossless LLM Context Window Scaling,'' \emph{arXiv preprint arXiv:2502.20082}, 2025.
+\bibitem{he2024bipe} Z. He, G. Feng, S. Luo, K. Yang, D. He, J. Xu, Z. Zhang, H. Yang, and L. Wang, ``Two Stones Hit One Bird: Bilevel Positional Encoding for Better Length Extrapolation,'' in \emph{Proceedings of the 41st International Conference on Machine Learning (ICML)}, 2024.
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,5 @@
+- [ ] Grammar
+- [ ] References
+- [ ] Figure numbers
+- [ ] Table numbers
+- [ ] Consistent terminology
