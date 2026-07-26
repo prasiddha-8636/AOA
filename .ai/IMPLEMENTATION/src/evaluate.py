@@ -12,12 +12,27 @@ import torch
 import numpy as np
 from typing import Dict, Any, List
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from src.config import BenchmarkConfig, MODELS_TO_EVAL
+from src.config import BenchmarkConfig, MODELS_TO_EVAL, ModelConfig
 
 
-def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cuda") -> Dict[str, float]:
+def get_max_pos_limit(model, model_info: Dict[str, Any]) -> int:
+    """Safely determine max supported position limit for a model."""
+    if model_info.get("has_fixed_pos_limit", False):
+        return model_info.get("max_pos", 1024)
+
+    for attr in ["max_position_embeddings", "n_positions", "max_seq_len"]:
+        val = getattr(model.config, attr, None)
+        if val is not None and isinstance(val, int) and val > 0:
+            return val
+    return 1000000
+
+
+def measure_memory_and_latency(model, tokenizer, seq_len: int, max_pos: int, device: str = "cuda") -> Dict[str, float]:
     """Measure peak VRAM usage (MB) and per-token latency (ms/token)."""
-    if not torch.cuda.is_available():
+    if not torch.cuda.is_available() or device == "cpu":
+        return {"vram_mb": 0.0, "latency_ms": 0.0}
+
+    if seq_len > max_pos:
         return {"vram_mb": 0.0, "latency_ms": 0.0}
 
     torch.cuda.empty_cache()
@@ -37,8 +52,11 @@ def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cu
     return {"vram_mb": round(peak_vram, 2), "latency_ms": round(latency_ms, 3)}
 
 
-def evaluate_perplexity(model, tokenizer, text: str, seq_len: int, stride: int = 512, device: str = "cuda") -> float:
+def evaluate_perplexity(model, tokenizer, text: str, seq_len: int, max_pos: int, stride: int = 512, device: str = "cuda") -> float:
     """Evaluate sliding-window perplexity for a target sequence length."""
+    if seq_len > max_pos:
+        raise ValueError(f"Sequence length {seq_len} exceeds model max position limit {max_pos}")
+
     encodings = tokenizer(text, return_tensors="pt")
     seq_len_total = encodings.input_ids.size(1)
 
@@ -51,6 +69,9 @@ def evaluate_perplexity(model, tokenizer, text: str, seq_len: int, stride: int =
             trg_len = end_loc - prev_end_loc
 
             input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+            if input_ids.size(1) > max_pos:
+                raise ValueError(f"Input slice length {input_ids.size(1)} exceeds model position limit {max_pos}")
+
             target_ids = input_ids.clone()
             target_ids[:, :-trg_len] = -100
 
@@ -74,9 +95,12 @@ def evaluate_perplexity(model, tokenizer, text: str, seq_len: int, stride: int =
 
 
 def evaluate_needle_haystack(
-    model, tokenizer, seq_len: int, depth_ratio: float, needle: str = "The secret code is 84920.", device: str = "cuda"
+    model, tokenizer, seq_len: int, max_pos: int, depth_ratio: float, needle: str = "The secret code is 84920.", device: str = "cuda"
 ) -> bool:
     """Evaluate zero-shot needle-in-a-haystack retrieval accuracy at a given depth ratio."""
+    if seq_len > max_pos:
+        return False
+
     haystack_filler = "The quick brown fox jumps over the lazy dog. Random context sentence to fill space. "
     haystack = haystack_filler * (seq_len // len(haystack_filler) + 10)
 
@@ -89,8 +113,8 @@ def evaluate_needle_haystack(
     prompt = tokenizer.decode(tokens) + "\nWhat is the secret code? Answer:"
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
 
-    if input_ids.size(1) > seq_len + 50:
-        input_ids = input_ids[:, : seq_len + 50]
+    if input_ids.size(1) > max_pos:
+        input_ids = input_ids[:, :max_pos]
 
     with torch.inference_mode():
         output = model.generate(input_ids, max_new_tokens=10, do_sample=False)
@@ -118,6 +142,8 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = BenchmarkConfig()
     ).to(device)
 
     model.eval()
+    max_pos = get_max_pos_limit(model, model_info)
+    has_fixed_pos = model_info.get("has_fixed_pos_limit", False)
 
     sample_text = (
         "Positional encoding is a crucial component of Transformer architectures. "
@@ -134,22 +160,35 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = BenchmarkConfig()
 
     for L in cfg.eval_lengths:
         print(f"\n--- Sequence Length L = {L} ---")
+
+        # Safely skip out-of-bounds evaluation for fixed position embedding models (e.g. GPT-2 L > 1024)
+        if has_fixed_pos and L > max_pos:
+            print(f"  [SKIPPED] Length L={L} exceeds fixed embedding limit ({max_pos})")
+            results["perplexity"][L] = f"Skipped (Exceeds Limit {max_pos})"
+            results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
+            results["needle_accuracy"][L] = {d: 0.0 for d in cfg.needle_depths}
+            continue
+
         try:
-            ppl = evaluate_perplexity(model, tokenizer, sample_text, seq_len=L, device=device)
+            ppl = evaluate_perplexity(model, tokenizer, sample_text, seq_len=L, max_pos=max_pos, device=device)
             results["perplexity"][L] = ppl
             print(f"  Perplexity: {ppl}")
         except Exception as e:
-            results["perplexity"][L] = "OOM/Failed"
+            results["perplexity"][L] = "Failed"
             print(f"  Perplexity evaluation failed: {e}")
 
-        overhead = measure_memory_and_latency(model, tokenizer, seq_len=L, device=device)
-        results["overhead"][L] = overhead
-        print(f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token")
+        try:
+            overhead = measure_memory_and_latency(model, tokenizer, seq_len=L, max_pos=max_pos, device=device)
+            results["overhead"][L] = overhead
+            print(f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token")
+        except Exception as e:
+            results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
+            print(f"  Memory measurement failed: {e}")
 
         results["needle_accuracy"][L] = {}
         for d in cfg.needle_depths:
             try:
-                acc = evaluate_needle_haystack(model, tokenizer, seq_len=L, depth_ratio=d, device=device)
+                acc = evaluate_needle_haystack(model, tokenizer, seq_len=L, max_pos=max_pos, depth_ratio=d, device=device)
                 results["needle_accuracy"][L][d] = 1.0 if acc else 0.0
                 print(f"  Needle @ depth {d*100:.0f}%: {'SUCCESS' if acc else 'FAIL'}")
             except Exception as e:
