@@ -93,13 +93,16 @@ class BenchmarkConfig:
         default_factory=lambda: [0.25, 0.50, 0.75, 0.90]
     )
     needle_num_trials: int = 10
-    # PG-19 per main.tex Data Collection Procedure. If unavailable (e.g. no network,
-    # or gated/slow on Colab), evaluate.get_eval_text() falls back to WikiText-103
-    # and prints a warning -- check the run log before trusting a perplexity number
-    # if you see that warning.
-    dataset_name: str = "pg19"
+    # PG-19 per main.tex Data Collection Procedure. The original deepmind/pg19 repo
+    # uses a Python loading script, which recent `datasets` versions refuse to run
+    # (security change) -- use emozilla/pg19, a script-free parquet mirror of the
+    # same data, confirmed to load directly. If unavailable, evaluate.get_eval_text()
+    # falls back to Salesforce/wikitext (the current namespaced id -- bare "wikitext"
+    # is the deprecated script-based repo and will also fail) and prints a warning --
+    # check the run log before trusting a perplexity number if you see that warning.
+    dataset_name: str = "emozilla/pg19"
     dataset_config: str = None
-    fallback_dataset_name: str = "wikitext"
+    fallback_dataset_name: str = "Salesforce/wikitext"
     fallback_dataset_config: str = "wikitext-103-raw-v1"
     torch_dtype: str = "float16"
     device: str = "cuda"

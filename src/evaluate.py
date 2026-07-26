@@ -53,8 +53,16 @@ def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
         print(f"  [WARNING] Failed to load primary dataset '{cfg.dataset_name}' ({e}). "
               f"Falling back to '{cfg.fallback_dataset_name}/{cfg.fallback_dataset_config}'. "
               f"Perplexity numbers from this run are NOT from PG-19.")
-        ds = load_dataset(cfg.fallback_dataset_name, cfg.fallback_dataset_config, split="test", streaming=True)
-        text = _concat_text(ds)
+        try:
+            ds = load_dataset(cfg.fallback_dataset_name, cfg.fallback_dataset_config, split="test", streaming=True)
+            text = _concat_text(ds)
+        except Exception as e2:
+            raise RuntimeError(
+                f"Both primary dataset '{cfg.dataset_name}' and fallback "
+                f"'{cfg.fallback_dataset_name}/{cfg.fallback_dataset_config}' failed to load. "
+                f"Primary error: {e}. Fallback error: {e2}. "
+                f"Check dataset ids are current (HF now requires namespaced repo ids)."
+            ) from e2
 
     _EVAL_TEXT_CACHE[cache_key] = text
     return text
