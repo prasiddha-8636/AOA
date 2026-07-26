@@ -3,13 +3,14 @@ One-click benchmark runner for Google Colab Free Tier.
 Runs zero-shot length extrapolation evaluations across:
 1. GPT-2 (Learned Absolute)
 2. Pythia-160M (Rotary - RoPE)
-3. OPT-350M (Linear Biases - ALiBi)
+3. BLOOM-560M (Linear Biases - ALiBi)
 
 Generates comparison tables and saves results to JSON.
 """
 
 import sys
 import os
+import gc
 import json
 import torch
 
@@ -32,6 +33,10 @@ def run_all_benchmarks():
     all_results = {}
 
     for model_key in MODELS_TO_EVAL.keys():
+        if torch.cuda.is_available():
+            gc.collect()
+            torch.cuda.empty_cache()
+
         try:
             res = run_full_model_eval(model_key, cfg)
             all_results[model_key] = res

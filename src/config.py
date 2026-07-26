@@ -10,18 +10,33 @@ MODELS_TO_EVAL: Dict[str, Dict[str, str]] = {
         "name": "GPT-2 (Learned Absolute)",
         "hf_model": "gpt2",
         "type": "Learned Absolute",
+        "has_fixed_pos_limit": True,
     },
     "rope": {
         "name": "Pythia-160M (RoPE)",
         "hf_model": "EleutherAI/pythia-160m",
         "type": "Rotary (RoPE)",
+        "has_fixed_pos_limit": False,
     },
     "alibi": {
-        "name": "OPT-350M (ALiBi)",
-        "hf_model": "facebook/opt-350m",
+        "name": "BLOOM-560M (ALiBi)",
+        "hf_model": "bigscience/bloom-560m",
         "type": "Linear Biases (ALiBi)",
+        "has_fixed_pos_limit": False,
     },
 }
+
+
+@dataclass
+class ModelConfig:
+    """Fallback class to preserve backwards compatibility."""
+    vocab_size: int = 50257
+    d_model: int = 768
+    n_layers: int = 12
+    n_heads: int = 12
+    d_head: int = 64
+    d_ff: int = 3072
+    max_seq_len: int = 512
 
 
 @dataclass

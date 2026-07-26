@@ -15,9 +15,18 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.config import BenchmarkConfig, MODELS_TO_EVAL
 
 
+def get_max_pos_limit(model) -> int:
+    """Safely extract model's max position limit if present."""
+    for attr in ["max_position_embeddings", "n_positions", "max_seq_len"]:
+        val = getattr(model.config, attr, None)
+        if val is not None and isinstance(val, int) and val > 0:
+            return val
+    return 1000000
+
+
 def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cuda") -> Dict[str, float]:
     """Measure peak VRAM usage (MB) and per-token latency (ms/token)."""
-    if not torch.cuda.is_available():
+    if not torch.cuda.is_available() or device == "cpu":
         return {"vram_mb": 0.0, "latency_ms": 0.0}
 
     torch.cuda.empty_cache()
@@ -118,6 +127,8 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = BenchmarkConfig()
     ).to(device)
 
     model.eval()
+    max_pos = get_max_pos_limit(model)
+    has_fixed_pos = model_info.get("has_fixed_pos_limit", False)
 
     sample_text = (
         "Positional encoding is a crucial component of Transformer architectures. "
@@ -134,17 +145,30 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = BenchmarkConfig()
 
     for L in cfg.eval_lengths:
         print(f"\n--- Sequence Length L = {L} ---")
+
+        # Safely skip out-of-bounds evaluation for fixed position embedding models (e.g. GPT-2 L > 1024)
+        if has_fixed_pos and L > max_pos:
+            print(f"  [SKIPPED] Length L={L} exceeds fixed embedding limit ({max_pos})")
+            results["perplexity"][L] = "Failed (Exceeds Embedding Limit)"
+            results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
+            results["needle_accuracy"][L] = {d: 0.0 for d in cfg.needle_depths}
+            continue
+
         try:
             ppl = evaluate_perplexity(model, tokenizer, sample_text, seq_len=L, device=device)
             results["perplexity"][L] = ppl
             print(f"  Perplexity: {ppl}")
         except Exception as e:
-            results["perplexity"][L] = "OOM/Failed"
+            results["perplexity"][L] = "Failed"
             print(f"  Perplexity evaluation failed: {e}")
 
-        overhead = measure_memory_and_latency(model, tokenizer, seq_len=L, device=device)
-        results["overhead"][L] = overhead
-        print(f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token")
+        try:
+            overhead = measure_memory_and_latency(model, tokenizer, seq_len=L, device=device)
+            results["overhead"][L] = overhead
+            print(f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token")
+        except Exception as e:
+            results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
+            print(f"  Memory measurement failed: {e}")
 
         results["needle_accuracy"][L] = {}
         for d in cfg.needle_depths:
