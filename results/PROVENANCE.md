@@ -24,3 +24,16 @@
 4. **Learned (controlled) uses position clamping** at L > 512 (positions clamp to
    the last training index) rather than a hard crash, mirroring the soft-failure
    behavior reported for learned absolute embeddings in the literature.
+5. **Controlled experiment (2026-08-08).** Three identical 17.6-17.7M-param
+   transformers (d=256, 6L, 4H, d_head=64, d_ff=1024, vocab 50257), trained on
+   WikiText-103 (~13.0M tokens, 200K-row stream cap) at seq 512, batch 16
+   (micro 8 x accum 2), 10K steps, AdamW lr 3e-4 wd 0.1, warmup 1000, cosine
+   decay, fp16 AMP. Only positional scheme differs: learned absolute, RoPE,
+   ALiBi. Seed 42 per method. Val ppl: learned 110.2, rope 88.1, alibi 93.7.
+   Eval: sliding-window ppl at 512-8192 on WikiText-103 validation; needle
+   retrieval all 0.0 (17M models lack retrieval capacity, not a PE effect);
+   latency 75.4/67.1/66.8K tok/s.
+6. **Controlled checkpoints** live in Google Drive
+   `MyDrive/AOAPaper_checkpoints/{learned,rope,alibi}/` (resume.pt + best.pt);
+   local copies on Colab `/content/checkpoints/`. Checkpoints back up every
+   1000 steps; Drive sync is best-effort and warned on failure.
