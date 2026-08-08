@@ -9,6 +9,12 @@ Evaluates:
 import time
 import random
 import torch
+import numpy as np
+
+if not hasattr(np, "long"):
+    np.long = np.int64
+if not hasattr(np, "ulong"):
+    np.ulong = np.uint64
 from typing import Dict, Any, List, Tuple
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.config import BenchmarkConfig, MODELS_TO_EVAL, ModelConfig
@@ -45,16 +51,27 @@ def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
         return "\n\n".join(chunks)
 
     try:
-        ds = load_dataset(cfg.dataset_name, cfg.dataset_config, split="test", streaming=True)
+        ds = load_dataset(
+            cfg.dataset_name, cfg.dataset_config, split="test", streaming=True
+        )
         text = _concat_text(ds)
         if len(text) < min_chars // 4:
-            raise ValueError(f"{cfg.dataset_name} returned suspiciously little text ({len(text)} chars)")
+            raise ValueError(
+                f"{cfg.dataset_name} returned suspiciously little text ({len(text)} chars)"
+            )
     except Exception as e:
-        print(f"  [WARNING] Failed to load primary dataset '{cfg.dataset_name}' ({e}). "
-              f"Falling back to '{cfg.fallback_dataset_name}/{cfg.fallback_dataset_config}'. "
-              f"Perplexity numbers from this run are NOT from PG-19.")
+        print(
+            f"  [WARNING] Failed to load primary dataset '{cfg.dataset_name}' ({e}). "
+            f"Falling back to '{cfg.fallback_dataset_name}/{cfg.fallback_dataset_config}'. "
+            f"Perplexity numbers from this run are NOT from PG-19."
+        )
         try:
-            ds = load_dataset(cfg.fallback_dataset_name, cfg.fallback_dataset_config, split="test", streaming=True)
+            ds = load_dataset(
+                cfg.fallback_dataset_name,
+                cfg.fallback_dataset_config,
+                split="test",
+                streaming=True,
+            )
             text = _concat_text(ds)
         except Exception as e2:
             raise RuntimeError(
@@ -96,7 +113,9 @@ def get_max_pos_limit(model, model_info: Dict[str, Any]) -> Tuple[int, bool]:
     return 1_000_000, False
 
 
-def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cuda") -> Dict[str, float]:
+def measure_memory_and_latency(
+    model, tokenizer, seq_len: int, device: str = "cuda"
+) -> Dict[str, float]:
     """Measure peak VRAM usage (MB) and per-token latency (ms/token)."""
     if not torch.cuda.is_available() or device == "cpu":
         return {"vram_mb": 0.0, "latency_ms": 0.0}
@@ -104,7 +123,9 @@ def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cu
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(device)
 
-    dummy_input = torch.randint(0, min(1000, tokenizer.vocab_size), (1, seq_len), device=device)
+    dummy_input = torch.randint(
+        0, min(1000, tokenizer.vocab_size), (1, seq_len), device=device
+    )
 
     start_time = time.perf_counter()
     with torch.inference_mode():
@@ -118,8 +139,9 @@ def measure_memory_and_latency(model, tokenizer, seq_len: int, device: str = "cu
     return {"vram_mb": round(peak_vram, 2), "latency_ms": round(latency_ms, 3)}
 
 
-def evaluate_perplexity(model, tokenizer, text: str, seq_len: int, device: str = "cuda",
-                         stride: int = 512) -> float:
+def evaluate_perplexity(
+    model, tokenizer, text: str, seq_len: int, device: str = "cuda", stride: int = 512
+) -> float:
     """Evaluate sliding-window perplexity for a target sequence length. No pre-emptive
     length gating here -- if the model genuinely can't handle seq_len, the forward
     pass raises and the caller records that as a real failure."""
@@ -183,11 +205,16 @@ def evaluate_ppl(model, dataloader, seq_len: int, device: str = "cuda") -> float
     if total_tokens == 0:
         return float("nan")
     import math
+
     return math.exp(total_nll / total_tokens)
 
 
 def evaluate_needle_haystack(
-    model, tokenizer, seq_len: int, depth_ratio: float, device: str = "cuda",
+    model,
+    tokenizer,
+    seq_len: int,
+    depth_ratio: float,
+    device: str = "cuda",
     n_trials: int = 10,
 ) -> float:
     """
@@ -215,8 +242,10 @@ def evaluate_needle_haystack(
         needle_ids = tokenizer.encode(needle)
 
         trial_ids = list(haystack_ids)
-        insert_idx = min(int(len(trial_ids) * depth_ratio), max(len(trial_ids) - len(needle_ids), 0))
-        trial_ids[insert_idx: insert_idx + len(needle_ids)] = needle_ids
+        insert_idx = min(
+            int(len(trial_ids) * depth_ratio), max(len(trial_ids) - len(needle_ids), 0)
+        )
+        trial_ids[insert_idx : insert_idx + len(needle_ids)] = needle_ids
 
         full_ids = trial_ids + question_ids
         input_ids = torch.tensor([full_ids], device=device)
@@ -224,7 +253,9 @@ def evaluate_needle_haystack(
         with torch.inference_mode():
             output = model.generate(input_ids, max_new_tokens=10, do_sample=False)
 
-        generated_text = tokenizer.decode(output[0][input_ids.size(1):], skip_special_tokens=True)
+        generated_text = tokenizer.decode(
+            output[0][input_ids.size(1) :], skip_special_tokens=True
+        )
         if code in generated_text:
             successes += 1
 
@@ -269,18 +300,24 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = None) -> Dict[str
         print(f"\n--- Sequence Length L = {L} ---")
 
         if is_hard_limit and L > max_pos:
-            print(f"  [SKIPPED] Length L={L} exceeds architectural embedding limit ({max_pos})")
+            print(
+                f"  [SKIPPED] Length L={L} exceeds architectural embedding limit ({max_pos})"
+            )
             results["perplexity"][L] = f"Skipped (hard limit {max_pos})"
             results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
             results["needle_accuracy"][L] = {d: None for d in cfg.needle_depths}
             continue
 
         if (not is_hard_limit) and L > max_pos:
-            print(f"  [NOTE] L={L} exceeds trained window ({max_pos}). Attempting anyway -- "
-                  f"this IS the extrapolation test.")
+            print(
+                f"  [NOTE] L={L} exceeds trained window ({max_pos}). Attempting anyway -- "
+                f"this IS the extrapolation test."
+            )
 
         try:
-            ppl = evaluate_perplexity(model, tokenizer, eval_text, seq_len=L, device=device)
+            ppl = evaluate_perplexity(
+                model, tokenizer, eval_text, seq_len=L, device=device
+            )
             results["perplexity"][L] = ppl
             print(f"  Perplexity: {ppl}")
         except Exception as e:
@@ -288,9 +325,13 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = None) -> Dict[str
             print(f"  Perplexity evaluation failed: {e}")
 
         try:
-            overhead = measure_memory_and_latency(model, tokenizer, seq_len=L, device=device)
+            overhead = measure_memory_and_latency(
+                model, tokenizer, seq_len=L, device=device
+            )
             results["overhead"][L] = overhead
-            print(f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token")
+            print(
+                f"  Peak VRAM: {overhead['vram_mb']} MB | Latency: {overhead['latency_ms']} ms/token"
+            )
         except Exception as e:
             results["overhead"][L] = {"vram_mb": 0.0, "latency_ms": 0.0}
             print(f"  Memory measurement failed: {e}")
@@ -298,12 +339,30 @@ def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = None) -> Dict[str
         results["needle_accuracy"][L] = {}
         for d in cfg.needle_depths:
             try:
+                # PREVENT DEVICE-SIDE ASSERT:
+                # If the model has a hard positional limit, generating tokens beyond max_pos
+                # will trigger a CUDA index out-of-bounds assertion.
+                max_new_tokens = 10
+                if is_hard_limit and (L + max_new_tokens) > max_pos:
+                    print(
+                        f"  [SKIPPED] Needle eval at L={L} skipped: total sequence length "
+                        f"({L} prompt + {max_new_tokens} generated tokens) exceeds hard limit ({max_pos})"
+                    )
+                    results["needle_accuracy"][L][d] = None
+                    continue
+
                 acc = evaluate_needle_haystack(
-                    model, tokenizer, seq_len=L, depth_ratio=d, device=device,
+                    model,
+                    tokenizer,
+                    seq_len=L,
+                    depth_ratio=d,
+                    device=device,
                     n_trials=cfg.needle_num_trials,
                 )
                 results["needle_accuracy"][L][d] = acc
-                print(f"  Needle @ depth {d*100:.0f}%: {acc*100:.0f}% ({cfg.needle_num_trials} trials)")
+                print(
+                    f"  Needle @ depth {d * 100:.0f}%: {acc * 100:.0f}% ({cfg.needle_num_trials} trials)"
+                )
             except Exception as e:
                 results["needle_accuracy"][L][d] = None
                 print(f"  Needle eval failed at L={L}, depth={d}: {e}")
@@ -315,7 +374,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="learned_absolute", choices=list(MODELS_TO_EVAL.keys()))
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="learned_absolute",
+        choices=list(MODELS_TO_EVAL.keys()),
+    )
     args = parser.parse_args()
 
     eval_results = run_full_model_eval(args.model)
