@@ -58,15 +58,23 @@ def _get_tokens(split, tokenizer, max_tokens=None):
         return torch.load(cache_path, weights_only=True)
     from datasets import load_dataset
 
-    ds = load_dataset(_WIKITEXT_REPO, _WIKITEXT_CONFIG, split=split)
-    text = "\n\n".join(ds["text"])
-    # Cap raw text before tokenizing: full WikiText-103 train (~500MB / ~103M
-    # tokens) can exceed memory on constrained hardware. Tokenize only enough
-    # text to cover max_tokens (chars roughly ~4x token count for GPT-2).
-    if max_tokens is not None:
-        max_chars = max_tokens * 4 + 1_000_000
-        if len(text) > max_chars:
-            text = text[:max_chars]
+    ds = load_dataset(
+        _WIKITEXT_REPO,
+        _WIKITEXT_CONFIG,
+        split=split,
+        streaming=True,
+    )
+    chunks, total = [], 0
+    for row in ds:
+        t = row.get("text", "")
+        if t:
+            chunks.append(t)
+            total += len(t)
+        if max_tokens is not None and total >= max_tokens * 4 + 1_000_000:
+            break
+        if total > 5_000_000:
+            break
+    text = "\n\n".join(chunks)
     tokens = torch.tensor(tokenizer.encode(text), dtype=torch.long)
     if max_tokens is not None and len(tokens) > max_tokens:
         tokens = tokens[:max_tokens]

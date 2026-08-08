@@ -1,0 +1,67 @@
+{
+  "model_name": "GPT-2 (Learned Absolute)",
+  "model_type": "Learned Absolute",
+  "trained_max_pos": 1024,
+  "is_hard_limit": true,
+  "perplexity": {
+    "512": 36.92,
+    "1024": 30.37,
+    "2048": "Skipped (hard limit 1024)",
+    "4096": "Skipped (hard limit 1024)",
+    "8192": "Skipped (hard limit 1024)"
+  },
+  "needle_accuracy": {
+    "512": {
+      "0.25": 1.0,
+      "0.5": 1.0,
+      "0.75": 1.0,
+      "0.9": 1.0
+    },
+    "1024": {
+      "0.25": 0.0,
+      "0.5": 0.0,
+      "0.75": 0.0,
+      "0.9": 0.0
+    },
+    "2048": {
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.9": null
+    },
+    "4096": {
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.9": null
+    },
+    "8192": {
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.9": null
+    }
+  },
+  "overhead": {
+    "512": {
+      "vram_mb": 0,
+      "latency_ms": 1.264
+    },
+    "1024": {
+      "vram_mb": 0,
+      "latency_ms": 1.689
+    },
+    "2048": {
+      "vram_mb": 0,
+      "latency_ms": 0
+    },
+    "4096": {
+      "vram_mb": 0,
+      "latency_ms": 0
+    },
+    "8192": {
+      "vram_mb": 0,
+      "latency_ms": 0
+    }
+  }
+}
