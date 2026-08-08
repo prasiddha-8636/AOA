@@ -34,10 +34,11 @@ MODELS_TO_EVAL: Dict[str, Dict[str, Any]] = {
 }
 
 # Method keys usable with src.model.pe.get_positional_encoding for the custom
-# from-scratch training track (profile.py / train.py). Kept separate from
-# MODELS_TO_EVAL above, which is for the pretrained-checkpoint zero-shot benchmark.
+# from-scratch training track (profile.py / train.py). Keys must match the
+# @register_pe decorators in src/model/pe/*.py ("learned", "sinusoidal",
+# "rope", "alibi", "nope", "kerple", "cable", "position_interpolation").
 ALL_METHODS: List[str] = [
-    "learned_absolute",
+    "learned",
     "rope",
     "alibi",
     "position_interpolation",
@@ -57,6 +58,7 @@ class ModelConfig:
         self.d_head = kwargs.get("d_head", 64)
         self.d_ff = kwargs.get("d_ff", 3072)
         self.max_seq_len = kwargs.get("max_seq_len", 512)
+        self.dropout = kwargs.get("dropout", 0.1)
 
     def dict(self):
         return self.__dict__
@@ -85,6 +87,8 @@ class TrainingConfig:
     grad_clip: float = 1.0
     eval_interval: int = 500
     mixed_precision: str = "fp16"
+    max_train_tokens: Optional[int] = None
+    max_val_tokens: Optional[int] = None
 
 
 @dataclass

@@ -6,6 +6,7 @@ Evaluates:
 3. Inference Overhead (VRAM in MB, latency in ms/token)
 """
 
+import os
 import time
 import random
 import torch
@@ -183,7 +184,56 @@ def evaluate_perplexity(
     return round(ppl, 2)
 
 
-def evaluate_ppl(model, dataloader, seq_len: int, device: str = "cuda") -> float:
+def evaluate_perplexity_custom(
+    model, tokenizer, text: str, seq_len: int, device: str = "cuda", stride: int = 512
+) -> float:
+    """Sliding-window perplexity for the from-scratch Transformer (which returns
+    raw logits, unlike HF models that return a loss). Mirrors the protocol of
+    evaluate_perplexity() so controlled and zero-shot numbers are comparable."""
+    encodings = tokenizer(text, return_tensors="pt")
+    seq_len_total = encodings.input_ids.size(1)
+    if seq_len_total < seq_len:
+        raise ValueError(
+            f"Eval text only has {seq_len_total} tokens, need at least {seq_len}."
+        )
+
+    nlls = []
+    prev_end_loc = 0
+
+    with torch.inference_mode():
+        for begin_loc in range(0, seq_len_total, stride):
+            end_loc = min(begin_loc + seq_len, seq_len_total)
+            trg_len = end_loc - prev_end_loc
+            if trg_len <= 0:
+                break
+
+            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+            target_ids = input_ids.clone()
+            target_ids[:, :-trg_len] = -100
+
+            logits = model(input_ids)
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = target_ids[:, 1:].contiguous()
+            loss_fct = torch.nn.CrossEntropyLoss(reduction="sum")
+            nll = loss_fct(
+                shift_logits.view(-1, logits.size(-1)),
+                shift_labels.view(-1),
+            )
+            nlls.append(nll)
+            prev_end_loc = end_loc
+            if end_loc == seq_len_total:
+                break
+
+    if not nlls:
+        return float("nan")
+
+    total_nll = torch.stack(nlls).sum()
+    total_tokens = max(prev_end_loc - 1, 1)
+    ppl = torch.exp(total_nll / total_tokens).item()
+    return round(ppl, 2)
+
+
+def evaluate_ppl(model, dataloader, seq_len: int, device="cuda") -> float:
     """
     Validation perplexity over a dataloader of (x, y) batches, used by train.py's
     training loop for periodic checkpoint selection. Distinct from

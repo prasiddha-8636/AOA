@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
-import wandb
 
 from src.config import ExperimentConfig, ModelConfig, TrainingConfig
 from src.model.transformer import Transformer
@@ -21,9 +20,17 @@ def cosine_schedule(step, warmup_steps, total_steps):
     return 0.5 * (1.0 + math.cos(math.pi * progress))
 
 
-def train(config, method, resume_from=None):
-    model_config = ModelConfig()
-    train_config = TrainingConfig()
+def train(
+    method,
+    model_config=None,
+    train_config=None,
+    resume_from=None,
+    out_dir="checkpoints",
+):
+    if model_config is None:
+        model_config = ModelConfig()
+    if train_config is None:
+        train_config = TrainingConfig()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     pe_module = get_positional_encoding(
@@ -31,14 +38,19 @@ def train(config, method, resume_from=None):
     )
     model = Transformer(model_config, pe_module).to(device)
 
-    if resume_from:
-        model.load_state_dict(torch.load(resume_from, map_location=device))
-
     train_loader = get_wikitext_dataloader(
-        "train", model_config.max_seq_len, train_config.batch_size
+        "train",
+        model_config.max_seq_len,
+        train_config.batch_size,
+        num_workers=0,
+        max_tokens=train_config.max_train_tokens,
     )
     val_loader = get_wikitext_dataloader(
-        "validation", model_config.max_seq_len, train_config.batch_size
+        "validation",
+        model_config.max_seq_len,
+        train_config.batch_size,
+        num_workers=0,
+        max_tokens=train_config.max_val_tokens,
     )
 
     optimizer = AdamW(
@@ -49,17 +61,34 @@ def train(config, method, resume_from=None):
         weight_decay=train_config.weight_decay,
     )
 
-    scheduler = LambdaLR(
-        optimizer,
-        lambda step: cosine_schedule(step, train_config.warmup_steps, train_config.total_steps),
-    )
-
-    scaler = torch.cuda.amp.GradScaler(enabled=(train_config.mixed_precision == "fp16"))
-
-    model.train()
     step = 0
     best_val_ppl = float("inf")
+    os.makedirs(out_dir, exist_ok=True)
+    resume_path = resume_from or os.path.join(out_dir, method, "resume.pt")
+    if os.path.exists(resume_path):
+        ckpt = torch.load(resume_path, map_location=device)
+        model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        step = ckpt["step"] + 1
+        best_val_ppl = ckpt.get("best_val_ppl", float("inf"))
+        print(f"[{method}] Resuming from step {step} (best_val_ppl={best_val_ppl:.4f})")
+
+    scheduler = LambdaLR(
+        optimizer,
+        lambda s: cosine_schedule(
+            s, train_config.warmup_steps, train_config.total_steps
+        ),
+    )
+    for _ in range(step):
+        scheduler.step()
+
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(train_config.mixed_precision == "fp16" and device.type == "cuda")
+    )
+
+    model.train()
     train_iter = iter(train_loader)
+    best_path = os.path.join(out_dir, method, "best.pt")
 
     while step < train_config.total_steps:
         try:
@@ -70,9 +99,13 @@ def train(config, method, resume_from=None):
 
         x, y = x.to(device), y.to(device)
 
-        with torch.cuda.amp.autocast(enabled=(train_config.mixed_precision == "fp16")):
+        with torch.cuda.amp.autocast(
+            enabled=(train_config.mixed_precision == "fp16" and device.type == "cuda")
+        ):
             logits = model(x)
-            loss = nn.CrossEntropyLoss()(logits.view(-1, model_config.vocab_size), y.view(-1))
+            loss = nn.CrossEntropyLoss()(
+                logits.view(-1, model_config.vocab_size), y.view(-1)
+            )
 
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -87,18 +120,33 @@ def train(config, method, resume_from=None):
             val_ppl = evaluate_ppl(model, val_loader, model_config.max_seq_len, device)
             model.train()
 
-            print(f"[{method}] Step {step}: loss={loss.item():.4f}, val_ppl={val_ppl:.4f}, lr={scheduler.get_last_lr()[0]:.2e}")
+            print(
+                f"[{method}] Step {step}: loss={loss.item():.4f}, "
+                f"val_ppl={val_ppl:.4f}, lr={scheduler.get_last_lr()[0]:.2e}",
+                flush=True,
+            )
 
             if val_ppl < best_val_ppl:
                 best_val_ppl = val_ppl
-                os.makedirs(f"checkpoints/{method}", exist_ok=True)
-                torch.save(model.state_dict(), f"checkpoints/{method}/best.pt")
+                os.makedirs(os.path.dirname(best_path), exist_ok=True)
+                torch.save(model.state_dict(), best_path)
+
+            # Durable resume point (Colab-safe)
+            torch.save(
+                {
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "step": step,
+                    "best_val_ppl": best_val_ppl,
+                },
+                resume_path,
+            )
 
         step += 1
 
     # Save final checkpoint
-    os.makedirs(f"checkpoints/{method}", exist_ok=True)
-    torch.save(model.state_dict(), f"checkpoints/{method}/final.pt")
+    os.makedirs(os.path.dirname(best_path), exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(out_dir, method, "final.pt"))
     print(f"[{method}] Training complete. Best val_ppl: {best_val_ppl:.4f}")
     return model
 
@@ -107,14 +155,19 @@ def train_pi(pretrained_path, train_len=512, target_len=2048):
     """Fine-tune RoPE checkpoint with Position Interpolation."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_config = ModelConfig()
-    pe_module = get_positional_encoding("position_interpolation", model_config.d_model, model_config.n_heads, model_config.max_seq_len)
+    pe_module = get_positional_encoding(
+        "position_interpolation",
+        model_config.d_model,
+        model_config.n_heads,
+        model_config.max_seq_len,
+    )
     pe_module.set_scale(train_len, target_len)
 
     model = Transformer(model_config, pe_module).to(device)
     model.load_state_dict(torch.load(pretrained_path, map_location=device))
 
-    train_loader = get_wikitext_dataloader("train", target_len, 32)
-    val_loader = get_wikitext_dataloader("validation", target_len, 32)
+    train_loader = get_wikitext_dataloader("train", target_len, 32, num_workers=0)
+    val_loader = get_wikitext_dataloader("validation", target_len, 32, num_workers=0)
 
     optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.1)
     scaler = torch.cuda.amp.GradScaler()
@@ -127,7 +180,9 @@ def train_pi(pretrained_path, train_len=512, target_len=2048):
 
         with torch.cuda.amp.autocast():
             logits = model(x)
-            loss = nn.CrossEntropyLoss()(logits.view(-1, model_config.vocab_size), y.view(-1))
+            loss = nn.CrossEntropyLoss()(
+                logits.view(-1, model_config.vocab_size), y.view(-1)
+            )
 
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -139,15 +194,5 @@ def train_pi(pretrained_path, train_len=512, target_len=2048):
         if step % 500 == 0:
             print(f"[PI] Step {step}: loss={loss.item():.4f}")
 
-    torch.save(model.state_dict(), f"checkpoints/position_interpolation/L{target_len}.pt")
-    return model
-
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--method", type=str, required=True)
-    parser.add_argument("--resume", type=str, default=None)
-    args = parser.parse_args()
-
-    train(ExperimentConfig(), args.method, args.resume)
+    torch.save(model.state_dict(), "checkpoints/position_interpolation/final.pt")
+    print("[PI] Fine-tuning complete.")
