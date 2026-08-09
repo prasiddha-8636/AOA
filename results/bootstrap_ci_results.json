@@ -1,0 +1,35 @@
+{
+  "note": "Bootstrap 95% CIs computed on per-window NLL data from evaluated checkpoints (2026-08-09). 1000 resamples, seed 42.",
+  "perplexity": {
+    "learned": {
+      "512": {"mean_ppl": 110.16, "ci_lo": 105.68, "ci_hi": 114.73, "n_windows": 482},
+      "1024": {"mean_ppl": 150.02, "ci_lo": 142.45, "ci_hi": 157.66, "n_windows": 241},
+      "2048": {"mean_ppl": 199.64, "ci_lo": 185.55, "ci_hi": 212.31, "n_windows": 120},
+      "4096": {"mean_ppl": 253.24, "ci_lo": 236.67, "ci_hi": 270.49, "n_windows": 60},
+      "8192": {"mean_ppl": 307.42, "ci_lo": 283.23, "ci_hi": 330.74, "n_windows": 30}
+    },
+    "rope": {
+      "512": {"mean_ppl": 88.13, "ci_lo": 84.43, "ci_hi": 91.95, "n_windows": 482},
+      "1024": {"mean_ppl": 114.99, "ci_lo": 109.06, "ci_hi": 120.76, "n_windows": 241},
+      "2048": {"mean_ppl": 176.48, "ci_lo": 164.27, "ci_hi": 187.54, "n_windows": 120},
+      "4096": {"mean_ppl": 245.29, "ci_lo": 228.55, "ci_hi": 263.8, "n_windows": 60},
+      "8192": {"mean_ppl": 310.61, "ci_lo": 285.65, "ci_hi": 334.17, "n_windows": 30}
+    },
+    "alibi": {
+      "512": {"mean_ppl": 126.92, "ci_lo": 121.93, "ci_hi": 132.07, "n_windows": 482},
+      "1024": {"mean_ppl": 125.44, "ci_lo": 118.87, "ci_hi": 131.93, "n_windows": 241},
+      "2048": {"mean_ppl": 124.6, "ci_lo": 115.8, "ci_hi": 132.74, "n_windows": 120},
+      "4096": {"mean_ppl": 124.26, "ci_lo": 115.54, "ci_hi": 133.47, "n_windows": 60},
+      "8192": {"mean_ppl": 124.34, "ci_lo": 114.87, "ci_hi": 133.07, "n_windows": 30}
+    }
+  },
+  "gap_analysis": {
+    "rope_vs_alibi_512": {
+      "observed_gap": -38.79,
+      "ci_95": [-40.42, -37.31],
+      "excludes_zero": true,
+      "published_claim_gap_inside_ci": false,
+      "published_alibi_93.7_inside_alibi_ci": false
+    }
+  }
+}
