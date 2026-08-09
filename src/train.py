@@ -90,6 +90,7 @@ def train(
     train_iter = iter(train_loader)
     best_path = os.path.join(out_dir, method, "best.pt")
 
+    accum_steps = max(1, train_config.batch_size // max(1, train_config.micro_batch))
     while step < train_config.total_steps:
         try:
             x, y = next(train_iter)
@@ -98,16 +99,18 @@ def train(
             x, y = next(train_iter)
 
         x, y = x.to(device), y.to(device)
-
-        with torch.cuda.amp.autocast(
-            enabled=(train_config.mixed_precision == "fp16" and device.type == "cuda")
-        ):
-            logits = model(x)
-            loss = nn.CrossEntropyLoss()(
-                logits.view(-1, model_config.vocab_size), y.view(-1)
-            )
-
-        scaler.scale(loss).backward()
+        x, y = x[: train_config.micro_batch * accum_steps], y[: train_config.micro_batch * accum_steps]
+        for k in range(accum_steps):
+            xb = x[k * train_config.micro_batch : (k + 1) * train_config.micro_batch]
+            yb = y[k * train_config.micro_batch : (k + 1) * train_config.micro_batch]
+            with torch.cuda.amp.autocast(
+                enabled=(train_config.mixed_precision == "fp16" and device.type == "cuda")
+            ):
+                logits = model(xb)
+                loss = nn.CrossEntropyLoss()(
+                    logits.view(-1, model_config.vocab_size), yb.view(-1)
+                )
+            scaler.scale(loss / accum_steps).backward()
         scaler.unscale_(optimizer)
         nn.utils.clip_grad_norm_(model.parameters(), train_config.grad_clip)
         scaler.step(optimizer)

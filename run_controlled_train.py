@@ -1,6 +1,6 @@
 """
 Train the three controlled from-scratch models (learned / rope / alibi)
-with an identical ~16M-parameter architecture on WikiText-103.
+with an identical ~17.7M-parameter architecture on WikiText-103.
 
 Usage:
   python run_controlled_train.py            # train all 3 methods, resuming any done
@@ -18,11 +18,11 @@ import torch
 from src.config import ModelConfig, TrainingConfig
 from src.train import train
 
-MODEL_DIM = 384
-N_LAYERS = 8
-N_HEADS = 8
+MODEL_DIM = 256
+N_LAYERS = 6
+N_HEADS = 4
 D_HEAD = 64
-D_FF = 1536
+D_FF = 1024
 MAX_SEQ_LEN = 512
 VOCAB = 50257
 
@@ -30,11 +30,12 @@ VOCAB = 50257
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", default=None, help="train only this method")
-    parser.add_argument("--steps", type=int, default=25000)
-    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--steps", type=int, default=10000)
+    parser.add_argument("--batch", type=int, default=16)
+    parser.add_argument("--micro-batch", type=int, default=8)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--warmup", type=int, default=1000)
-    parser.add_argument("--eval-interval", type=int, default=500)
+    parser.add_argument("--eval-interval", type=int, default=1000)
     args = parser.parse_args()
 
     methods = ["learned", "rope", "alibi"] if args.method is None else [args.method]
@@ -49,10 +50,11 @@ def main():
         d_ff=D_FF,
         max_seq_len=MAX_SEQ_LEN,
         vocab_size=VOCAB,
-        dropout=0.1,
+        dropout=0.0,
     )
     tc = TrainingConfig(
         batch_size=args.batch,
+        micro_batch=args.micro_batch,
         learning_rate=args.lr,
         warmup_steps=args.warmup,
         total_steps=args.steps,

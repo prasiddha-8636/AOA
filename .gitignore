@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.ruff_cache/
+cache/
+build/
+*.pdf
+!paper/figures/*.pdf
+results/plots/
+results/archive/

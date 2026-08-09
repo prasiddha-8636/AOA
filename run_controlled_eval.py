@@ -39,13 +39,13 @@ from src.evaluate import (
 )
 
 EVAL_LENGTHS = [512, 1024, 2048, 4096, 8192]
-NEEDLE_DEPTHS = [0.25, 0.50, 0.75, 0.90]
+NEEDLE_DEPTHS = [0.0, 0.25, 0.50, 0.75, 1.0]
 N_TRIALS = 10
-MODEL_DIM = 384
-N_LAYERS = 8
-N_HEADS = 8
+MODEL_DIM = 256
+N_LAYERS = 6
+N_HEADS = 4
 D_HEAD = 64
-D_FF = 1536
+D_FF = 1024
 MAX_SEQ_LEN = 512
 VOCAB = 50257
 
@@ -59,7 +59,7 @@ def build_model(method: str, checkpoint: str, device: str):
         d_ff=D_FF,
         max_seq_len=MAX_SEQ_LEN,
         vocab_size=VOCAB,
-        dropout=0.1,
+        dropout=0.0,
     )
     pe = get_positional_encoding(method, cfg.d_model, cfg.n_heads, cfg.max_seq_len)
     model = Transformer(cfg, pe).to(device)

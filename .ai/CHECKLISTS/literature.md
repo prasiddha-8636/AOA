@@ -1,5 +1,0 @@
-- [ ] Every paper read
-- [ ] Every claim cited
-- [ ] Comparison completed
-- [ ] Research gap identified
-- [ ] Latest papers included

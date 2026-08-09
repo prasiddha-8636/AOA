@@ -77,6 +77,7 @@ class TrainingConfig:
     """Optimizer / schedule settings for train.py."""
 
     batch_size: int = 32
+    micro_batch: int = 8
     learning_rate: float = 3e-4
     beta1: float = 0.9
     beta2: float = 0.95
@@ -96,7 +97,9 @@ class BenchmarkConfig:
     eval_lengths: List[int] = field(
         default_factory=lambda: [512, 1024, 2048, 4096, 8192]
     )
-    needle_depths: List[float] = field(default_factory=lambda: [0.25, 0.50, 0.75, 0.90])
+    needle_depths: List[float] = field(
+        default_factory=lambda: [0.0, 0.25, 0.50, 0.75, 1.0]
+    )
     needle_num_trials: int = 10
     # PG-19 per main.tex Data Collection Procedure. The original deepmind/pg19 repo
     # uses a Python loading script, which recent `datasets` versions refuse to run
