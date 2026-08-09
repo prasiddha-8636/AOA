@@ -84,7 +84,7 @@ print("Saved extrapolation_ratio.pdf")
 fig, axes = plt.subplots(1, 3, figsize=(8, 3.5))
 for i, m in enumerate(["learned", "rope", "alibi"]):
     ctx = [512, 1024, 2048, 4096, 8192]
-    depths = [0.25, 0.5, 0.75, 0.9]
+    depths = [0.0, 0.25, 0.5, 0.75, 1.0]
     heatmap = np.zeros((len(depths), len(ctx)))
     ax = axes[i]
     im = ax.imshow(heatmap, cmap="RdYlGn", vmin=0, vmax=1, aspect="auto")

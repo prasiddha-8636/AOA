@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  9 AUG 2026 14:47
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  9 AUG 2026 16:39
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -731,35 +731,38 @@ LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 1
 (/usr/share/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
-Underfull \hbox (badness 3407) in paragraph at lines 185--186
- \OT1/ptm/m/it/10 a) Setup.: [][] \OT1/ptm/m/n/10 Three iden-ti-cal trans-forme
-r ar-chi-tec-tures
+Underfull \hbox (badness 2318) in paragraph at lines 173--175
+\OT1/cmr/m/n/10 3[]10[]$\OT1/ptm/m/n/10 , weight de-cay 0.1, warmup 1,000, co-s
+ine de-
  []
 
 
-Overfull \hbox (93.71645pt too wide) in paragraph at lines 195--207
- [][] 
+Underfull \hbox (badness 1383) in paragraph at lines 173--175
+\OT1/ptm/m/n/10 the WikiText-103 val-i-da-tion split us-ing slid-ing win-dows
+ []
+
+
+Underfull \hbox (badness 3407) in paragraph at lines 185--186
+ \OT1/ptm/m/it/10 a) Setup.: [][] \OT1/ptm/m/n/10 Three iden-ti-cal trans-forme
+r ar-chi-tec-tures
  []
 
 [3]
 <figures/needle_heatmaps.pdf, id=29, 578.16pt x 252.945pt>
 File: figures/needle_heatmaps.pdf Graphic file (type pdf)
 <use figures/needle_heatmaps.pdf>
-Package pdftex.def Info: figures/needle_heatmaps.pdf  used on input line 215.
+Package pdftex.def Info: figures/needle_heatmaps.pdf  used on input line 216.
 (pdftex.def)             Requested size: 252.0pt x 110.25018pt.
-
-Underfull \vbox (badness 2717) has occurred while \output is active []
-
 <figures/ppl_curves.pdf, id=30, 397.485pt x 274.626pt>
 File: figures/ppl_curves.pdf Graphic file (type pdf)
 <use figures/ppl_curves.pdf>
-Package pdftex.def Info: figures/ppl_curves.pdf  used on input line 240.
+Package pdftex.def Info: figures/ppl_curves.pdf  used on input line 241.
 (pdftex.def)             Requested size: 252.0pt x 174.11319pt.
 <figures/extrapolation_ratio.pdf, id=31, 397.485pt x 274.626pt>
 File: figures/extrapolation_ratio.pdf Graphic file (type pdf)
 <use figures/extrapolation_ratio.pdf>
 Package pdftex.def Info: figures/extrapolation_ratio.pdf  used on input line 24
-7.
+8.
 (pdftex.def)             Requested size: 252.0pt x 174.11319pt.
  [4 <./figures/needle_heatmaps.pdf> <./figures/ppl_curves.pdf> <./figures/extra
 polation_ratio.pdf>] [5]
@@ -783,13 +786,13 @@ L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 26634 strings out of 469515
- 616002 string characters out of 5470807
- 1023309 words of memory out of 5000000
- 54952 multiletter control sequences out of 15000+600000
- 671177 words of font info for 123 fonts, out of 8000000 for 9000
+ 26637 strings out of 469515
+ 616068 string characters out of 5470807
+ 1023195 words of memory out of 5000000
+ 54954 multiletter control sequences out of 15000+600000
+ 672284 words of font info for 124 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 120i,11n,117p,1724b,2313s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 120i,11n,117p,1663b,2313s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/
 texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texmf-dist/font
 s/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texmf-dist/fonts/type1/public/
@@ -804,7 +807,7 @@ t/fonts/type1/urw/courier/ucrr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/tim
 es/utmb8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/sh
 are/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texmf-dist/fonts/ty
 pe1/urw/times/utmri8a.pfb>
-Output written on main.pdf (6 pages, 258134 bytes).
+Output written on main.pdf (6 pages, 258448 bytes).
 PDF statistics:
  267 PDF objects out of 1000 (max. 8388607)
  91 compressed objects within 1 object stream
