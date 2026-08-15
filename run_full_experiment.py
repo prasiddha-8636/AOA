@@ -19,6 +19,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from src.colab_io import persist_path
+
 # ── Training methods (must train from scratch) ──
 # rope is needed for PI/YaRN; all others are new baselines
 REQUIRED_TRAINS = ["rope", "learned", "alibi", "sinusoidal", "nope", "kerple", "cable"]
@@ -72,9 +74,10 @@ def train_one(method, steps=10000, batch=16, micro_batch=8, lr=3e-4, warmup=1000
         mixed_precision="fp16",
     )
 
-    ckpt_dir = os.path.join("checkpoints", method, "best.pt")
-    if os.path.exists(ckpt_dir):
-        print(f"[SKIP] checkpoint already exists: {ckpt_dir}")
+    ckpt_dir = persist_path("checkpoints", "checkpoints")
+    ckpt_path = os.path.join(ckpt_dir, method, "best.pt")
+    if os.path.exists(ckpt_path):
+        print(f"[SKIP] checkpoint already exists: {ckpt_path}")
         return
 
     print(f"\n{'=' * 60}\nTraining: {method} ({steps} steps)\n{'=' * 60}")

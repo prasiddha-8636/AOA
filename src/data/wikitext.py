@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 
 import numpy as np
 
+from src.colab_io import persist_path
+
 if not hasattr(np, "long"):
     np.long = np.int64
 if not hasattr(np, "ulong"):
@@ -11,8 +13,9 @@ if not hasattr(np, "ulong"):
 
 _WIKITEXT_REPO = "Salesforce/wikitext"
 _WIKITEXT_CONFIG = "wikitext-103-raw-v1"
-_TOKEN_CACHE_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache"
+_TOKEN_CACHE_DIR = persist_path(
+    "cache",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cache"),
 )
 
 

@@ -32,6 +32,7 @@ from transformers import GPT2Tokenizer
 from src.config import BenchmarkConfig, ModelConfig
 from src.model.pe import get_positional_encoding
 from src.model.transformer import Transformer
+from src.colab_io import persist_path
 from src.evaluate import (
     evaluate_perplexity_custom,
     evaluate_needle_haystack,
@@ -89,7 +90,7 @@ def main():
         help="methods to evaluate; position_interpolation/yarn load the rope checkpoint",
     )
     args = parser.parse_args()
-    checkpoint_dir = args.checkpoint_dir
+    checkpoint_dir = persist_path("checkpoints", args.checkpoint_dir)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if device == "cuda" else torch.float32
     print(
@@ -189,6 +190,7 @@ def main():
         if methods == ["learned", "rope", "alibi"]
         else f"results/controlled_results_{'_'.join(methods)}.json"
     )
+    out_name = persist_path("results", out_name)
     with open(out_name, "w") as f:
         json.dump(out, f, indent=2)
     print(f"\nSaved {out_name}")

@@ -11,6 +11,7 @@ from src.model.transformer import Transformer
 from src.model.pe import get_positional_encoding
 from src.data.wikitext import get_wikitext_dataloader
 from src.evaluate import evaluate_ppl
+from src.colab_io import persist_path
 
 
 def cosine_schedule(step, warmup_steps, total_steps):
@@ -31,6 +32,7 @@ def train(
         model_config = ModelConfig()
     if train_config is None:
         train_config = TrainingConfig()
+    out_dir = persist_path("checkpoints", out_dir)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     pe_module = get_positional_encoding(
