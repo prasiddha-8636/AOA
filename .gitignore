@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .ruff_cache/
 cache/
+checkpoints/
 build/
 *.pdf
 !paper/figures/*.pdf
