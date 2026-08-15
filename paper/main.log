@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  13 AUG 2026 02:44
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  15 AUG 2026 18:24
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -720,84 +720,73 @@ onts/enc/dvips/base/8r.enc}
 
 
 ]
-Underfull \hbox (badness 1448) in paragraph at lines 145--146
-\OT1/ptm/m/n/10 range, multi-hop re-trieval [5], [16]. RoPE has no hard
- []
-
-
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [2]
-Underfull \hbox (badness 10000) in paragraph at lines 171--172
+Underfull \hbox (badness 10000) in paragraph at lines 160--161
 []\OT1/ptm/b/n/10 Inference Over-head\OT1/ptm/m/n/10 : Track per-token la-tency
 
  []
 
 LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 1
-76.
+65.
 (/usr/share/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
-Underfull \hbox (badness 2318) in paragraph at lines 175--177
+Underfull \hbox (badness 2318) in paragraph at lines 164--166
 \OT1/cmr/m/n/10 3[]10[]$\OT1/ptm/m/n/10 , weight de-cay 0.1, warmup 1,000, co-s
 ine de-
  []
 
 
-Underfull \hbox (badness 1383) in paragraph at lines 175--177
+Underfull \hbox (badness 1383) in paragraph at lines 164--166
 \OT1/ptm/m/n/10 the WikiText-103 val-i-da-tion split us-ing slid-ing win-dows
- []
-
-
-Underfull \hbox (badness 2035) in paragraph at lines 186--187
- \OT1/ptm/m/it/10 a) Setup.: [][] \OT1/ptm/m/n/10 Iden-ti-cal trans-former ar-c
-hi-tec-tures (17.6--
  []
 
 [3]
 <figures/needle_heatmaps.pdf, id=30, 578.16pt x 252.945pt>
 File: figures/needle_heatmaps.pdf Graphic file (type pdf)
 <use figures/needle_heatmaps.pdf>
-Package pdftex.def Info: figures/needle_heatmaps.pdf  used on input line 219.
+Package pdftex.def Info: figures/needle_heatmaps.pdf  used on input line 208.
 (pdftex.def)             Requested size: 252.0pt x 110.25018pt.
 <figures/ppl_curves.pdf, id=31, 397.485pt x 274.626pt>
 File: figures/ppl_curves.pdf Graphic file (type pdf)
 <use figures/ppl_curves.pdf>
-Package pdftex.def Info: figures/ppl_curves.pdf  used on input line 244.
+Package pdftex.def Info: figures/ppl_curves.pdf  used on input line 232.
 (pdftex.def)             Requested size: 252.0pt x 174.11319pt.
 <figures/extrapolation_ratio.pdf, id=32, 397.485pt x 274.626pt>
 File: figures/extrapolation_ratio.pdf Graphic file (type pdf)
 <use figures/extrapolation_ratio.pdf>
-Package pdftex.def Info: figures/extrapolation_ratio.pdf  used on input line 25
-1.
+Package pdftex.def Info: figures/extrapolation_ratio.pdf  used on input line 23
+9.
 (pdftex.def)             Requested size: 252.0pt x 174.11319pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 259--260
+Underfull \hbox (badness 10000) in paragraph at lines 247--248
 []\OT1/ptm/m/n/10 As sup-ple-men-tary con-text, we eval-u-ate three
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 259--260
+Underfull \hbox (badness 10000) in paragraph at lines 247--248
 \OT1/ptm/m/n/10 pre-trained mod-els zero-shot at se-quence lengths
  []
 
 
-Underfull \hbox (badness 2790) in paragraph at lines 259--260
+Underfull \hbox (badness 2790) in paragraph at lines 247--248
 \OT1/ptm/m/n/10 Eval-u-a-tions use long-form book text (\OT1/ptm/m/it/10 Moby D
 ick\OT1/ptm/m/n/10 ) for
  []
 
 
-Underfull \hbox (badness 1371) in paragraph at lines 259--260
+Underfull \hbox (badness 1371) in paragraph at lines 247--248
 \OT1/ptm/m/n/10 text-level match-ing and does not change the qual-i-ta-tive
  []
 
-[4 <./figures/needle_heatmaps.pdf>]
-Underfull \hbox (badness 2103) in paragraph at lines 305--306
+[4 <./figures/needle_heatmaps.pdf> <./figures/ppl_curves.pdf>]
+Underfull \hbox (badness 2103) in paragraph at lines 293--294
 []\OT1/ptm/m/n/10 Position In-ter-po-la-tion and YaRN are eval-u-ated as
  []
 
-[5 <./figures/ppl_curves.pdf> <./figures/extrapolation_ratio.pdf>]
+[5 <./figures/extrapolation_ratio.pdf>]
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -818,11 +807,11 @@ L3 programming layer <2026-01-19>
 Here is how much of TeX's memory you used:
  26637 strings out of 469515
  616068 string characters out of 5470807
- 1022981 words of memory out of 5000000
+ 1022948 words of memory out of 5000000
  54954 multiletter control sequences out of 15000+600000
  672284 words of font info for 124 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 120i,11n,117p,1580b,2313s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 120i,11n,117p,2238b,2313s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/
 texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texmf-dist/font
 s/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texmf-dist/fonts/type1/public/
@@ -838,7 +827,7 @@ rw/courier/ucrr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><
 /usr/share/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/share/texmf-dist/
 fonts/type1/urw/times/utmr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/u
 tmri8a.pfb>
-Output written on main.pdf (6 pages, 270926 bytes).
+Output written on main.pdf (6 pages, 270144 bytes).
 PDF statistics:
  272 PDF objects out of 1000 (max. 8388607)
  94 compressed objects within 1 object stream

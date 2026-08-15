@@ -16,22 +16,48 @@ with open("results/bootstrap_ci_results.json") as f:
 OUT = "paper/figures"
 os.makedirs(OUT, exist_ok=True)
 
-colors = {"learned": "#e74c3c", "rope": "#3498db", "alibi": "#2ecc71"}
-labels = {"learned": "Learned Absolute", "rope": "RoPE", "alibi": "ALiBi"}
+palette = [
+    "#e74c3c",
+    "#3498db",
+    "#2ecc71",
+    "#f39c12",
+    "#9b59b6",
+    "#1abc9c",
+    "#e67e22",
+    "#c0392b",
+    "#16a085",
+]
+labels = {
+    "learned": "Learned",
+    "sinusoidal": "Sinusoidal",
+    "rope": "RoPE",
+    "alibi": "ALiBi",
+    "kerple": "KERPLE",
+    "cable": "CABLE",
+    "nope": "NoPE",
+    "position_interpolation": "PI",
+    "yarn": "YaRN",
+}
+# All methods present in the results file, in a stable order.
+methods = [m for m in labels if m in data]
+colors = {m: palette[i % len(palette)] for i, m in enumerate(methods)}
 
 # --- Fig 1: PPL curves with bootstrap CI bands ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
-for m in ["learned", "rope", "alibi"]:
+for m in methods:
+    if m not in data:
+        continue
     ppl = data[m]["ppl"]
-    ci = ci_data[m]
-    xs = sorted(int(k) for k in ppl)
+    ci = ci_data.get(m, {})
+    xs = sorted(int(k) for k in ppl if isinstance(ppl[k], (int, float)))
     ys = [ppl[str(x)] for x in xs]
-    lo = [ci[str(x)]["ci_lo"] for x in xs]
-    hi = [ci[str(x)]["ci_hi"] for x in xs]
+    lo = [ci[str(x)].get("ci_lo") for x in xs] if ci else None
+    hi = [ci[str(x)].get("ci_hi") for x in xs] if ci else None
     ax.plot(
         xs, ys, marker="o", color=colors[m], label=labels[m], linewidth=2, markersize=5
     )
-    ax.fill_between(xs, lo, hi, color=colors[m], alpha=0.15)
+    if lo and hi and all(v is not None for v in lo + hi):
+        ax.fill_between(xs, lo, hi, color=colors[m], alpha=0.15)
 ax.set_xscale("log", base=2)
 ax.set_xticks([512, 1024, 2048, 4096, 8192])
 ax.set_xticklabels(["512", "1024", "2048", "4096", "8192"])
@@ -47,9 +73,14 @@ print("Saved ppl_curves.pdf")
 # --- Fig 2: Extrapolation ratio bar chart ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
 ratios = {}
-for m in ["learned", "rope", "alibi"]:
+for m in methods:
+    if m not in data:
+        continue
     ppl = data[m]["ppl"]
-    ratios[m] = ppl["8192"] / ppl["512"]
+    if isinstance(ppl.get("8192"), (int, float)) and isinstance(
+        ppl.get("512"), (int, float)
+    ):
+        ratios[m] = ppl["8192"] / ppl["512"]
 
 names = [labels[m] for m in ratios]
 vals = [ratios[m] for m in ratios]

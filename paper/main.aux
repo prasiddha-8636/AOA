@@ -19,7 +19,7 @@
 \newlabel{sec:introduction}{{I}{1}{}{section.1}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
 \newlabel{sec:related}{{II}{1}{}{section.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Zero-Shot Extrapolation}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Extrapolation and Design Trade-offs}{1}{}\protected@file@percent }
 \citation{press2022}
 \citation{chen2023}
 \citation{peng2023yarn,liu2024scaling}
@@ -30,58 +30,54 @@
 \citation{veisi2025cable}
 \citation{dai2019}
 \citation{press2022,su2024roformer}
-\citation{shaw2018,raffel2020}
 \citation{veisi2025cable}
 \citation{chen2023,peng2023yarn,liu2024scaling}
 \citation{vaswani2017}
+\citation{su2024roformer}
+\citation{press2022}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces A taxonomy of positional encoding methods for Transformer models.}}{2}{}\protected@file@percent }
 \newlabel{fig:taxonomy}{{1}{2}{}{figure.1}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Comparison of Major Positional Encoding Methods}}{2}{}\protected@file@percent }
 \newlabel{tab:comparison}{{I}{2}{}{table.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Fine-Tuning Requirements}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Recency Bias and Long-Range Retrieval}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Compute and Implementation Cost}{2}{}\protected@file@percent }
-\citation{su2024roformer}
+\@writefile{toc}{\contentsline {section}{\numberline {III}Methodology}{2}{}\protected@file@percent }
+\newlabel{sec:methodology}{{III}{2}{}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Theoretical Framework and Justification}{2}{}\protected@file@percent }
 \citation{press2022}
-\citation{press2022}
-\@writefile{toc}{\contentsline {section}{\numberline {III}Methodology}{3}{}\protected@file@percent }
-\newlabel{sec:methodology}{{III}{3}{}{section.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Theoretical Framework and Justification}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Research Design}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Data Collection Procedure}{3}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Controlled Experiment: Perplexity Across Context Lengths (bootstrap 95\% CIs in brackets)}}{3}{}\protected@file@percent }
+\newlabel{tab:controlled_ppl}{{II}{3}{}{table.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Data Processing and Analysis Tools}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {IV}Experimental Results}{3}{}\protected@file@percent }
 \newlabel{sec:results}{{IV}{3}{}{section.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Controlled Experiment}{3}{}\protected@file@percent }
 \newlabel{sec:controlled}{{\mbox  {IV-A}}{3}{}{subsection.4.1}{}}
 \@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0a}Setup.}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0b}Reproducibility note.}{3}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Controlled Experiment: Perplexity Across Context Lengths (bootstrap 95\% CIs in brackets)}}{4}{}\protected@file@percent }
-\newlabel{tab:controlled_ppl}{{II}{4}{}{table.2}{}}
-\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0c}Perplexity extrapolation.}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0b}Reproducibility.}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0c}Perplexity extrapolation.}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0d}Retrieval accuracy.}{4}{}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Controlled experiment needle retrieval: all methods score 0\% at 17.7M parameters, indicating capacity-bound retrieval independent of the positional encoding.}}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0e}Inference latency.}{4}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Controlled experiment needle retrieval: all evaluated methods score 0\% at 17.7M parameters, indicating capacity-bound retrieval independent of the positional encoding.}}{4}{}\protected@file@percent }
 \newlabel{fig:needle}{{2}{4}{}{figure.2}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Controlled Experiment: Inference Latency at $L{=}512$}}{4}{}\protected@file@percent }
 \newlabel{tab:controlled_latency}{{III}{4}{}{table.3}{}}
-\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0e}Inference latency.}{4}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Controlled experiment: perplexity versus context length. Learned and RoPE degrade sharply beyond $L{=}512$; ALiBi remains flat through $L{=}8192$ ($16\times $ training length).}}{4}{}\protected@file@percent }
+\newlabel{fig:controlled_ppl}{{3}{4}{}{figure.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Zero-Shot Evaluation of Pre-trained Models}{4}{}\protected@file@percent }
 \newlabel{sec:zeroshot}{{\mbox  {IV-B}}{4}{}{subsection.4.2}{}}
 \citation{chen2023,peng2023yarn}
 \citation{press2022}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Controlled experiment: perplexity versus context length. Learned and RoPE degrade sharply beyond $L{=}512$; ALiBi remains flat through $L{=}8192$ ($16\times $ training length).}}{5}{}\protected@file@percent }
-\newlabel{fig:controlled_ppl}{{3}{5}{}{figure.3}{}}
+\citation{press2022}
+\citation{chen2023,peng2023yarn}
 \@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Perplexity degradation ratio (ppl at $L{=}8192$ / ppl at $L{=}512$). ALiBi maintains ratio $\approx $1.0 while learned and RoPE degrade $2.8\times $ and $3.5\times $ respectively.}}{5}{}\protected@file@percent }
 \newlabel{fig:extrapolation}{{4}{5}{}{figure.4}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Zero-Shot Needle Retrieval Accuracy (Pre-trained Models, avg.\ over depths)}}{5}{}\protected@file@percent }
 \newlabel{tab:needle}{{IV}{5}{}{table.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Limitations}{5}{}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {V}{\ignorespaces Zero-Shot Perplexity (Pre-trained Models)}}{5}{}\protected@file@percent }
 \newlabel{tab:ppl}{{V}{5}{}{table.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Limitations}{5}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {V}Conclusion}{5}{}\protected@file@percent }
 \newlabel{sec:conclusion}{{V}{5}{}{section.5}{}}
-\citation{press2022}
-\citation{chen2023,peng2023yarn}
 \bibcite{vaswani2017}{1}
 \bibcite{touvron2023}{2}
 \bibcite{devlin2019}{3}
