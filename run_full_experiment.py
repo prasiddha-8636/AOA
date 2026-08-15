@@ -17,6 +17,10 @@ import os
 import sys
 import time
 
+# Set before torch import: reduce CUDA allocator fragmentation from CABLE's
+# repeated large bias-tensor allocations (recommended by the OOM message itself).
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.colab_io import persist_path

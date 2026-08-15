@@ -50,7 +50,7 @@ def train(
     val_loader = get_wikitext_dataloader(
         "validation",
         model_config.max_seq_len,
-        train_config.batch_size,
+        min(4, train_config.batch_size),
         num_workers=0,
         max_tokens=train_config.max_val_tokens,
     )
