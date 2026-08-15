@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import torch
 
-from src.config import ModelConfig, TrainingConfig
+from src.config import ALL_METHODS, ModelConfig, TrainingConfig
 from src.train import train
 
 MODEL_DIM = 256
@@ -38,9 +38,9 @@ def main():
     parser.add_argument("--eval-interval", type=int, default=1000)
     args = parser.parse_args()
 
-    methods = ["learned", "rope", "alibi"] if args.method is None else [args.method]
-    if args.method not in ("learned", "rope", "alibi", None):
-        raise SystemExit(f"Unknown method: {args.method}")
+    methods = ALL_METHODS if args.method is None else [args.method]
+    if args.method is not None and args.method not in ALL_METHODS:
+        raise SystemExit(f"Unknown method: {args.method}. Available: {ALL_METHODS}")
 
     mc = ModelConfig(
         d_model=MODEL_DIM,

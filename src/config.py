@@ -39,10 +39,13 @@ MODELS_TO_EVAL: Dict[str, Dict[str, Any]] = {
 # "rope", "alibi", "nope", "kerple", "cable", "position_interpolation").
 ALL_METHODS: List[str] = [
     "learned",
+    "sinusoidal",
     "rope",
     "alibi",
     "position_interpolation",
+    "yarn",
     "cable",
+    "kerple",
     "nope",
 ]
 

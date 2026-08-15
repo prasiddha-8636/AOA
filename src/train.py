@@ -99,12 +99,19 @@ def train(
             x, y = next(train_iter)
 
         x, y = x.to(device), y.to(device)
-        x, y = x[: train_config.micro_batch * accum_steps], y[: train_config.micro_batch * accum_steps]
+        x, y = (
+            x[: train_config.micro_batch * accum_steps],
+            y[: train_config.micro_batch * accum_steps],
+        )
         for k in range(accum_steps):
             xb = x[k * train_config.micro_batch : (k + 1) * train_config.micro_batch]
             yb = y[k * train_config.micro_batch : (k + 1) * train_config.micro_batch]
+            if xb.shape[0] == 0:
+                continue  # partial last batch in the dataloader
             with torch.cuda.amp.autocast(
-                enabled=(train_config.mixed_precision == "fp16" and device.type == "cuda")
+                enabled=(
+                    train_config.mixed_precision == "fp16" and device.type == "cuda"
+                )
             ):
                 logits = model(xb)
                 loss = nn.CrossEntropyLoss()(

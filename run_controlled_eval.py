@@ -50,7 +50,7 @@ MAX_SEQ_LEN = 512
 VOCAB = 50257
 
 
-def build_model(method: str, checkpoint: str, device: str):
+def build_model(method: str, checkpoint: str, device: str, strict: bool = True):
     cfg = ModelConfig(
         d_model=MODEL_DIM,
         n_layers=N_LAYERS,
@@ -64,13 +64,32 @@ def build_model(method: str, checkpoint: str, device: str):
     pe = get_positional_encoding(method, cfg.d_model, cfg.n_heads, cfg.max_seq_len)
     model = Transformer(cfg, pe).to(device)
     state = torch.load(checkpoint, map_location=device)
-    model.load_state_dict(state)
+    model.load_state_dict(state, strict=strict)
+    if method == "position_interpolation":
+        pe.set_scale(MAX_SEQ_LEN, 8192)
+    elif method == "yarn":
+        pe.set_ratio(MAX_SEQ_LEN, 8192)
     model.eval()
     return model
 
 
+# Inference-time RoPE-scaling extensions reuse the vanilla RoPE checkpoint.
+ROPE_EXTENSIONS = {"position_interpolation", "yarn"}
+
+
 def main():
-    checkpoint_dir = sys.argv[1] if len(sys.argv) > 1 else "checkpoints"
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoint_dir", nargs="?", default="checkpoints")
+    parser.add_argument(
+        "--methods",
+        nargs="+",
+        default=["learned", "rope", "alibi"],
+        help="methods to evaluate; position_interpolation/yarn load the rope checkpoint",
+    )
+    args = parser.parse_args()
+    checkpoint_dir = args.checkpoint_dir
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if device == "cuda" else torch.float32
     print(
@@ -81,15 +100,20 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
     eval_text = get_eval_text(BenchmarkConfig(), min_chars=512 * 8 * 30)
 
-    methods = ["learned", "rope", "alibi"]
+    methods = args.methods
     out = {}
     for method in methods:
-        ckpt = os.path.join(checkpoint_dir, method, "best.pt")
+        if method in ROPE_EXTENSIONS:
+            ckpt = os.path.join(checkpoint_dir, "rope", "best.pt")
+            strict = False
+        else:
+            ckpt = os.path.join(checkpoint_dir, method, "best.pt")
+            strict = True
         if not os.path.exists(ckpt):
             print(f"[SKIP] no checkpoint for {method}: {ckpt}")
             continue
         print(f"\n=== {method} ===")
-        model = build_model(method, ckpt, device)
+        model = build_model(method, ckpt, device, strict=strict)
 
         res = {
             "model_type": method,
@@ -160,9 +184,14 @@ def main():
             torch.cuda.empty_cache()
 
     os.makedirs("results", exist_ok=True)
-    with open("results/controlled_results.json", "w") as f:
+    out_name = (
+        "results/controlled_results.json"
+        if methods == ["learned", "rope", "alibi"]
+        else f"results/controlled_results_{'_'.join(methods)}.json"
+    )
+    with open(out_name, "w") as f:
         json.dump(out, f, indent=2)
-    print("\nSaved results/controlled_results.json")
+    print(f"\nSaved {out_name}")
 
 
 if __name__ == "__main__":
