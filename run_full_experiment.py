@@ -86,9 +86,13 @@ def train_one(method, steps=10000, batch=16, micro_batch=8, lr=3e-4, warmup=1000
     )
 
     ckpt_dir = persist_path("checkpoints", "checkpoints")
-    ckpt_path = os.path.join(ckpt_dir, method, "best.pt")
-    if os.path.exists(ckpt_path):
-        print(f"[SKIP] checkpoint already exists: {ckpt_path}")
+    # Skip only when training actually completed. best.pt is written as soon as
+    # val_ppl improves (mid-training), so using it here would skip methods whose
+    # run crashed early and never reached total_steps. final.pt is written only
+    # after the full loop, so it is the correct "already done" marker.
+    done_path = os.path.join(ckpt_dir, method, "final.pt")
+    if os.path.exists(done_path):
+        print(f"[SKIP] training already complete: {done_path}")
         return
 
     print(f"\n{'=' * 60}\nTraining: {method} ({steps} steps)\n{'=' * 60}")
