@@ -45,6 +45,13 @@ def train_one(method, steps=10000, batch=16, micro_batch=8, lr=3e-4, warmup=1000
     from src.config import ModelConfig, TrainingConfig
     from src.train import train
 
+    # CABLE's bias net materializes O(B*H*L*L*D) expanded q/k tensors retained
+    # in the autograd graph through backward. Shrink the micro-batch and grow
+    # gradient accumulation: identical effective batch and summed gradient, but
+    # 4x lower activation memory on small GPUs.
+    if method == "cable":
+        micro_batch = 2
+
     MODEL_DIM, N_LAYERS, N_HEADS, D_HEAD, D_FF, MAX_SEQ_LEN, VOCAB = (
         256,
         6,
