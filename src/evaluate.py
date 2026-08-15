@@ -16,14 +16,20 @@ if not hasattr(np, "long"):
     np.long = np.int64
 if not hasattr(np, "ulong"):
     np.ulong = np.uint64
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.config import BenchmarkConfig, MODELS_TO_EVAL, ModelConfig
 
 _EVAL_TEXT_CACHE: Dict[str, str] = {}
 
 
-def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
+def get_eval_text(
+    cfg: BenchmarkConfig,
+    min_chars: int = 400_000,
+    dataset_name: Optional[str] = None,
+    dataset_config: Optional[str] = None,
+    split: str = "test",
+) -> str:
     """
     Load real evaluation text (PG-19 by default) instead of a repeated toy sentence.
     Repeated text is trivially predictable and produces meaningless (near-1.0)
@@ -32,8 +38,16 @@ def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
     Falls back to WikiText-103 if the primary dataset can't be loaded (no network,
     gated dataset, etc.), and prints a clear warning so a bad number isn't silently
     reported as if it came from PG-19.
+
+    Pass dataset_name/dataset_config/split to force a specific source (e.g. the
+    controlled from-scratch models must be scored on the WikiText-103 validation
+    split they were trained on, never on PG-19).
     """
-    cache_key = f"{cfg.dataset_name}:{cfg.dataset_config}"
+    if dataset_name is None:
+        dataset_name = cfg.dataset_name
+    if dataset_config is None:
+        dataset_config = cfg.dataset_config
+    cache_key = f"{dataset_name}:{dataset_config}:{split}"
     if cache_key in _EVAL_TEXT_CACHE:
         return _EVAL_TEXT_CACHE[cache_key]
 
@@ -52,17 +66,15 @@ def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
         return "\n\n".join(chunks)
 
     try:
-        ds = load_dataset(
-            cfg.dataset_name, cfg.dataset_config, split="test", streaming=True
-        )
+        ds = load_dataset(dataset_name, dataset_config, split=split, streaming=True)
         text = _concat_text(ds)
         if len(text) < min_chars // 4:
             raise ValueError(
-                f"{cfg.dataset_name} returned suspiciously little text ({len(text)} chars)"
+                f"{dataset_name} returned suspiciously little text ({len(text)} chars)"
             )
     except Exception as e:
         print(
-            f"  [WARNING] Failed to load primary dataset '{cfg.dataset_name}' ({e}). "
+            f"  [WARNING] Failed to load primary dataset '{dataset_name}' ({e}). "
             f"Falling back to '{cfg.fallback_dataset_name}/{cfg.fallback_dataset_config}'. "
             f"Perplexity numbers from this run are NOT from PG-19."
         )
@@ -70,7 +82,7 @@ def get_eval_text(cfg: BenchmarkConfig, min_chars: int = 400_000) -> str:
             ds = load_dataset(
                 cfg.fallback_dataset_name,
                 cfg.fallback_dataset_config,
-                split="test",
+                split=split,
                 streaming=True,
             )
             text = _concat_text(ds)
@@ -312,7 +324,9 @@ def evaluate_needle_haystack(
     return round(successes / n_trials, 3)
 
 
-def run_full_model_eval(model_key: str, cfg: BenchmarkConfig = None) -> Dict[str, Any]:
+def run_full_model_eval(
+    model_key: str, cfg: Optional[BenchmarkConfig] = None
+) -> Dict[str, Any]:
     """Run full benchmark for a specified model key."""
     if cfg is None:
         cfg = BenchmarkConfig()

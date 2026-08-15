@@ -99,7 +99,18 @@ def main():
 
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
-    eval_text = get_eval_text(BenchmarkConfig(), min_chars=512 * 8 * 30)
+    # Controlled from-scratch models trained on WikiText-103 train; they must be
+    # scored on the WikiText-103 *validation* split, never on PG-19 (the
+    # BenchmarkConfig default). Scoring a wikitext-trained model on PG-19 book
+    # text yields meaningless out-of-distribution perplexity.
+    eval_text = get_eval_text(
+        BenchmarkConfig(),
+        min_chars=512 * 8 * 30,
+        dataset_name="Salesforce/wikitext",
+        dataset_config="wikitext-103-raw-v1",
+        split="validation",
+    )
+    print(f"  eval_text: {len(eval_text):,} chars (WikiText-103 validation, forced)")
 
     methods = args.methods
     out = {}
