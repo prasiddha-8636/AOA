@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  9 AUG 2026 17:19
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  13 AUG 2026 02:44
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -720,7 +720,14 @@ onts/enc/dvips/base/8r.enc}
 
 
 ]
-[2]
+Underfull \hbox (badness 1448) in paragraph at lines 145--146
+\OT1/ptm/m/n/10 range, multi-hop re-trieval [5], [16]. RoPE has no hard
+ []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [2]
 Underfull \hbox (badness 10000) in paragraph at lines 171--172
 []\OT1/ptm/b/n/10 Inference Over-head\OT1/ptm/m/n/10 : Track per-token la-tency
 
@@ -742,9 +749,9 @@ Underfull \hbox (badness 1383) in paragraph at lines 175--177
  []
 
 
-Underfull \hbox (badness 3407) in paragraph at lines 186--187
- \OT1/ptm/m/it/10 a) Setup.: [][] \OT1/ptm/m/n/10 Three iden-ti-cal trans-forme
-r ar-chi-tec-tures
+Underfull \hbox (badness 2035) in paragraph at lines 186--187
+ \OT1/ptm/m/it/10 a) Setup.: [][] \OT1/ptm/m/n/10 Iden-ti-cal trans-former ar-c
+hi-tec-tures (17.6--
  []
 
 [3]
@@ -785,11 +792,12 @@ Underfull \hbox (badness 1371) in paragraph at lines 259--260
 \OT1/ptm/m/n/10 text-level match-ing and does not change the qual-i-ta-tive
  []
 
+[4 <./figures/needle_heatmaps.pdf>]
+Underfull \hbox (badness 2103) in paragraph at lines 305--306
+[]\OT1/ptm/m/n/10 Position In-ter-po-la-tion and YaRN are eval-u-ated as
+ []
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [4 <./figures/needle_heatmaps.pdf> <./figures/ppl_curves.pdf> <./figures/extra
-polation_ratio.pdf>] [5]
+[5 <./figures/ppl_curves.pdf> <./figures/extrapolation_ratio.pdf>]
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -801,9 +809,7 @@ Before submitting the final camera ready copy, remember to:
  uses only Type 1 fonts and that every step in the generation
  process uses the appropriate paper size.
 
-[6
-
-] (./main.aux)
+[6] (./main.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -812,7 +818,7 @@ L3 programming layer <2026-01-19>
 Here is how much of TeX's memory you used:
  26637 strings out of 469515
  616068 string characters out of 5470807
- 1022666 words of memory out of 5000000
+ 1022981 words of memory out of 5000000
  54954 multiletter control sequences out of 15000+600000
  672284 words of font info for 124 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
@@ -832,7 +838,7 @@ rw/courier/ucrr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><
 /usr/share/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/share/texmf-dist/
 fonts/type1/urw/times/utmr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/u
 tmri8a.pfb>
-Output written on main.pdf (6 pages, 268486 bytes).
+Output written on main.pdf (6 pages, 270926 bytes).
 PDF statistics:
  272 PDF objects out of 1000 (max. 8388607)
  94 compressed objects within 1 object stream
