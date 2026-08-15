@@ -27,10 +27,14 @@ class CausalSelfAttention(nn.Module):
         k = self.k_proj(x).reshape(B, L, self.n_heads, self.d_head).transpose(1, 2)
         v = self.v_proj(x).reshape(B, L, self.n_heads, self.d_head).transpose(1, 2)
 
-        if self.pe_type == "RotaryPositionalEncoding":
+        if self.pe_type in (
+            "RotaryPositionalEncoding",
+            "PositionInterpolation",
+            "YarnPositionalEncoding",
+        ):
             q, k = self.pe_module.rotate_qk(q, k)
 
-        att = (q @ k.transpose(-2, -1)) * (self.d_head ** -0.5)
+        att = (q @ k.transpose(-2, -1)) * (self.d_head**-0.5)
 
         if self.pe_type == "AlibiPositionalEncoding":
             att = att + self.pe_module.get_bias(L, device)
@@ -41,9 +45,7 @@ class CausalSelfAttention(nn.Module):
         if self.pe_type == "CABLEPositionalEncoding":
             att = att + self.pe_module.get_bias(q, k)
 
-        causal_mask = torch.triu(
-            torch.ones(L, L, device=device), diagonal=1
-        ).bool()
+        causal_mask = torch.triu(torch.ones(L, L, device=device), diagonal=1).bool()
         att = att.masked_fill(causal_mask, float("-inf"))
         att = F.softmax(att, dim=-1)
         att = self.dropout(att)
