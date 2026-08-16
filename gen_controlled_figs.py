@@ -38,73 +38,71 @@ labels = {
 methods = [m for m in labels if m in data]
 colors = {m: palette[i % len(palette)] for i, m in enumerate(methods)}
 
-# --- Fig 1: PPL curves ---
+# --- Fig 1: PPL curves (log y to handle Sinusoidal blowup) ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
 for m in methods:
     ppl = data[m]["ppl"]
     xs = sorted(int(k) for k in ppl if isinstance(ppl[k], (int, float)))
     ys = [ppl[str(x)] for x in xs]
+    lw = 1.5 if m == "sinusoidal" else 2
+    ls = "--" if m == "sinusoidal" else "-"
     ax.plot(
-        xs, ys, marker="o", color=colors[m], label=labels[m], linewidth=2, markersize=5
+        xs,
+        ys,
+        marker="o",
+        color=colors[m],
+        label=labels[m],
+        linewidth=lw,
+        markersize=4,
+        linestyle=ls,
     )
+ax.set_yscale("log")
 ax.set_xscale("log", base=2)
 ax.set_xticks([512, 1024, 2048, 4096, 8192])
 ax.set_xticklabels(["512", "1024", "2048", "4096", "8192"])
 ax.set_xlabel("Context Length", fontsize=11)
-ax.set_ylabel("Perplexity", fontsize=11)
-ax.set_title("Perplexity vs Context Length", fontsize=12)
-ax.legend(fontsize=8, ncol=3, loc="upper left")
-ax.grid(True, alpha=0.3)
+ax.set_ylabel("Perplexity (log scale)", fontsize=11)
+ax.legend(fontsize=7, ncol=3, loc="upper left")
+ax.grid(True, alpha=0.3, which="both")
 plt.tight_layout()
 fig.savefig(f"{OUT}/ppl_curves.pdf", bbox_inches="tight")
 plt.close(fig)
 
-# --- Fig 2: Extrapolation ratio ---
+# --- Fig 2: Extrapolation ratio (cap Sinusoidal) ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
 ratios = {}
 for m in methods:
     ppl = data[m]["ppl"]
-    p512 = ppl.get("512", ppl.get(512))
-    p8192 = ppl.get("8192", ppl.get(8192))
+    p512 = ppl.get("512")
+    p8192 = ppl.get("8192")
     if p512 and p8192:
         ratios[m] = p8192 / p512
-# Sort by ratio
+
 sorted_methods = sorted(ratios, key=ratios.get)
 bar_colors = [colors[m] for m in sorted_methods]
 bar_labels = [labels[m] for m in sorted_methods]
-bar_values = [ratios[m] for m in sorted_methods]
+bar_values = [min(ratios[m], 100) for m in sorted_methods]  # cap at 100 for display
 bars = ax.barh(bar_labels, bar_values, color=bar_colors, edgecolor="white", height=0.6)
-ax.axvline(x=1.0, color="gray", linestyle="--", alpha=0.5, label="No change")
+ax.axvline(x=1.0, color="gray", linestyle="--", alpha=0.5)
 ax.set_xlabel("PPL$_{8192}$ / PPL$_{512}$", fontsize=11)
-ax.set_title("Extrapolation Ratio", fontsize=12)
 ax.grid(True, axis="x", alpha=0.3)
-# Cap sinusoidal for readability
-for bar, val in zip(bars, bar_values):
-    if val > 100:
-        ax.text(
-            bar.get_width() - 10,
-            bar.get_y() + bar.get_height() / 2,
-            f"{val:.0f}$\\times$",
-            ha="right",
-            va="center",
-            fontsize=9,
-            color="white",
-            fontweight="bold",
-        )
-    else:
-        ax.text(
-            bar.get_width() + 1,
-            bar.get_y() + bar.get_height() / 2,
-            f"{val:.2f}$\\times$",
-            ha="left",
-            va="center",
-            fontsize=9,
-        )
+for bar, m in zip(bars, sorted_methods):
+    val = ratios[m]
+    x = bar.get_width()
+    label = f"{val:.2f}$\\times$" if val < 100 else f"{val:.0f}$\\times$"
+    ax.text(
+        x + 1,
+        bar.get_y() + bar.get_height() / 2,
+        label,
+        ha="left",
+        va="center",
+        fontsize=9,
+    )
 plt.tight_layout()
 fig.savefig(f"{OUT}/extrapolation_ratio.pdf", bbox_inches="tight")
 plt.close(fig)
 
-# --- Fig 3: Needle heatmap (0% everywhere, show one representative) ---
+# --- Fig 3: Needle heatmap (0% everywhere) ---
 fig, ax = plt.subplots(figsize=(4, 3))
 depths = ["0%", "25%", "50%", "75%", "100%"]
 lengths = ["512", "1024", "2048", "4096", "8192"]
