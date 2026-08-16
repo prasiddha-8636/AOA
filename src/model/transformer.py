@@ -3,6 +3,7 @@ from src.config import ModelConfig
 import torch
 import torch.nn as nn
 from .pe import PositionalEncoding
+from .pe.absolute import LearnedPositionalEncoding, SinusoidalPositionalEncoding
 from .layers import TransformerBlock
 
 
@@ -45,12 +46,12 @@ class Transformer(nn.Module):
         B, L = input_ids.shape
         x = self.token_embedding(input_ids)
 
-        if not isinstance(self.pe_module, type(None)):
-            pe_type = type(self.pe_module).__name__
-            if pe_type in ("LearnedPositionalEncoding", "SinusoidalPositionalEncoding"):
-                x = self.pe_module(x)
-            elif pe_type == "NoPositionalEncoding":
-                pass
+        if isinstance(
+            self.pe_module, (LearnedPositionalEncoding, SinusoidalPositionalEncoding)
+        ):
+            x = self.pe_module(x)
+        elif isinstance(self.pe_module, type(None)):
+            pass
 
         x = self.dropout(x)
         for block in self.blocks:
