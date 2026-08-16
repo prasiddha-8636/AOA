@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  16 AUG 2026 08:45
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.5.31)  16 AUG 2026 09:37
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -740,29 +740,34 @@ Underfull \hbox (badness 5274) in paragraph at lines 225--226
 rts la-tency and
  []
 
-<figures/ppl_curves.pdf, id=26, 389.53351pt x 267.16508pt>
+<figures/ppl_curves.pdf, id=26, 390.25995pt x 267.40096pt>
 File: figures/ppl_curves.pdf Graphic file (type pdf)
 <use figures/ppl_curves.pdf>
 Package pdftex.def Info: figures/ppl_curves.pdf  used on input line 229.
-(pdftex.def)             Requested size: 252.0pt x 172.83585pt.
+(pdftex.def)             Requested size: 252.0pt x 172.67017pt.
 <figures/needle_heatmaps.pdf, id=27, 282.67926pt x 208.9359pt>
 File: figures/needle_heatmaps.pdf Graphic file (type pdf)
 <use figures/needle_heatmaps.pdf>
 Package pdftex.def Info: figures/needle_heatmaps.pdf  used on input line 236.
 (pdftex.def)             Requested size: 252.0pt x 186.2616pt.
-<figures/extrapolation_ratio.pdf, id=28, 388.86465pt x 267.52446pt>
+<figures/extrapolation_ratio.pdf, id=28, 388.87685pt x 267.76036pt>
 File: figures/extrapolation_ratio.pdf Graphic file (type pdf)
 <use figures/extrapolation_ratio.pdf>
 Package pdftex.def Info: figures/extrapolation_ratio.pdf  used on input line 24
 3.
-(pdftex.def)             Requested size: 252.0pt x 173.36632pt.
+(pdftex.def)             Requested size: 252.0pt x 173.51102pt.
 
 Underfull \hbox (badness 1430) in paragraph at lines 250--251
 \OT1/ptm/m/n/10 2 (124M, Learned Ab-so-lute), Pythia-160M (RoPE), and
  []
 
-[3 <./figures/ppl_curves.pdf> <./figures/needle_heatmaps.pdf>] [4 <./figures/ex
-trapolation_ratio.pdf>]
+[3 <./figures/ppl_curves.pdf> <./figures/needle_heatmaps.pdf>]
+Underfull \hbox (badness 2293) in paragraph at lines 278--279
+[]\OT1/ptm/b/n/10 Flat \OT1/ptm/m/n/10 (ra-tio $\OMS/cmsy/m/n/10 ^^Y$\OT1/ptm/m
+/n/10 1.0): AL-iBi and CA-BLE. Both use
+ []
+
+[4 <./figures/extrapolation_ratio.pdf>]
 Underfull \hbox (badness 10000) in paragraph at lines 323--324
 []\OT1/ptm/m/n/8 R. Anil et al., ``PaLM 2 tech-ni-cal re-port,'' \OT1/ptm/m/it/
 8 arXiv preprint
@@ -790,11 +795,11 @@ L3 programming layer <2026-01-19>
 Here is how much of TeX's memory you used:
  26719 strings out of 469515
  617569 string characters out of 5470807
- 1027841 words of memory out of 5000000
+ 1030748 words of memory out of 5000000
  55036 multiletter control sequences out of 15000+600000
  672284 words of font info for 124 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 120i,11n,117p,1580b,2379s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 120i,11n,117p,1779b,2379s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/
 texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texmf-dist/font
 s/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texmf-dist/fonts/type1/public/
@@ -810,10 +815,10 @@ rw/courier/ucrr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><
 /usr/share/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/share/texmf-dist/
 fonts/type1/urw/times/utmr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/u
 tmri8a.pfb>
-Output written on main.pdf (5 pages, 252975 bytes).
+Output written on main.pdf (5 pages, 253156 bytes).
 PDF statistics:
- 273 PDF objects out of 1000 (max. 8388607)
- 91 compressed objects within 1 object stream
+ 265 PDF objects out of 1000 (max. 8388607)
+ 87 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  28 words of extra memory for PDF output out of 10000 (max. 10000000)
 

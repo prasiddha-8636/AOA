@@ -42,8 +42,16 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
     def _grow(self, L, device):
         """Grow the cached table to L rows on demand (needle generation reaches
         L=8193, one past the eval max)."""
-        extra = self._build_pe(L - self.pe.shape[0], self.d_model)
-        self.pe = torch.cat([self.pe, extra], dim=0)
+        start = self.pe.shape[0]
+        pos = torch.arange(start, L).unsqueeze(1).float()
+        div_term = torch.exp(
+            torch.arange(0, self.d_model, 2).float()
+            * -(torch.log(torch.tensor(10000.0)) / self.d_model)
+        )
+        pe = torch.zeros(L - start, self.d_model)
+        pe[:, 0::2] = torch.sin(pos * div_term)
+        pe[:, 1::2] = torch.cos(pos * div_term)
+        self.pe = torch.cat([self.pe, pe.to(self.pe.dtype)], dim=0)
 
     def forward(self, x, past_length=0):
         B, L, D = x.shape
