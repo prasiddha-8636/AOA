@@ -29,7 +29,7 @@ prasiddha.080bct027@tcioe.edu.np
 \maketitle
 
 \begin{abstract}
-Positional encoding controls how transformers generalize past their training length. We train nine comparable architectures ($\sim$17.6M parameters) from scratch on WikiText-103 at a fixed context length of 512 tokens, varying only the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, and two inference-time RoPE extensions (Position Interpolation, YaRN). We measure perplexity, needle retrieval accuracy, and inference latency from 512 to 8,192 tokens ($16\times$ the training length). ALiBi and CABLE remain near-perfectly stable through extrapolation (ratio $\approx$1.0), while NoPE (1.27$\times$), KERPLE (1.30$\times$), and YaRN (1.59$\times$) degrade moderately, Learned (1.76$\times$) and RoPE (2.11$\times$) degrade sharply, and Sinusoidal fails catastrophically ($>$800$\times$). Needle retrieval scores 0\% across all models, indicating a capacity-bound failure independent of positional encoding. ALiBi's stability comes at a cost: its precomputed attention bias buffer consumes 1.26\,GB of VRAM, $6.5\times$ the memory footprint of the other methods.
+Positional encoding controls how transformers generalize past their training length. We train nine comparable architectures ($\sim$17.6M parameters) from scratch on WikiText-103 at a fixed context length of 512 tokens, varying only the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, and two inference-time RoPE extensions (Position Interpolation, YaRN). We measure perplexity, needle retrieval accuracy, and inference latency from 512 to 8,192 tokens ($16\times$ the training length). ALiBi and CABLE stay flat through extrapolation (ratio $\approx$1.0). NoPE (1.27$\times$), KERPLE (1.30$\times$), and YaRN (1.59$\times$) degrade modestly. Learned (1.76$\times$) and RoPE (2.11$\times$) degrade 2$\times$ or more. Sinusoidal fails above 800$\times$. Needle retrieval scores 0\% across all models, a capacity-bound failure independent of positional encoding. ALiBi's precomputed attention bias buffer consumes 1.26\,GB of VRAM, $6.5\times$ the memory footprint of every other method.
 \end{abstract}
 
 \section{Introduction}
@@ -37,7 +37,7 @@ Positional encoding controls how transformers generalize past their training len
 
 Transformer architectures are the standard foundation for natural language processing \cite{vaswani2017,touvron2023}. Self-attention models dependencies across sequence tokens, but it treats inputs as unordered sets without positional information \cite{vaswani2017}.
 
-Positional encodings assign position representations to tokens. Early models used absolute encodings: fixed sinusoidal functions or learned position embeddings \cite{vaswani2017,devlin2019,radford2019}. These work within the training window but degrade rapidly on longer sequences \cite{press2022}.
+Positional encodings assign position representations to tokens. Early models used absolute encodings: fixed sinusoidal functions or learned position embeddings \cite{vaswani2017,devlin2019,radford2019}. These work within the training window and degrade on longer sequences \cite{press2022}.
 
 Recent architectures use relative rotations or attention score biases to address this. Rotary Positional Encoding (RoPE) rotates query and key vectors in complex space \cite{su2024roformer}. Attention with Linear Biases (ALiBi) adds distance-based penalties directly to attention logits \cite{press2022}. Several RoPE extensions have been proposed for long-context deployment: Position Interpolation (PI) compresses the position scale to fit longer sequences \cite{chen2023}, and YaRN applies NTK-aware frequency scaling \cite{peng2023yarn}. KERPLE and CABLE apply learned bias functions over pairwise distances, while NoPE ablates positional encoding entirely \cite{kazemnejad2023,cable2023}.
 
@@ -135,9 +135,9 @@ PI and YaRN do not train new models. They rescale the RoPE frequencies so that t
 
 \subsection{Theoretical Framework and Justification}
 
-Self-attention compares query and key vectors using similarity scores. Without positional encoding, self-attention treats inputs as unordered sets \cite{vaswani2017}. Positional encodings break this symmetry by injecting position information into attention.
+Self-attention compares query and key vectors using similarity scores. Without positional encoding, it treats inputs as unordered sets \cite{vaswani2017}. Positional encodings inject position information into attention.
 
-The nine methods we evaluate group into paradigm families:
+The nine methods group into paradigm families:
 \begin{enumerate}
 \item \textbf{Absolute}: Learned embedding vectors added to input tokens; fixed Sinusoidal functions.
 \item \textbf{Rotary (RoPE)}: Complex rotations applied to query and key vectors \cite{su2024roformer}. PI and YaRN extend RoPE for long-context inference.
@@ -159,7 +159,7 @@ For the controlled experiment, we evaluate at context lengths $L \in \{512, 1024
 The controlled experiment trains on WikiText-103 (GPT-2 tokenizer, vocab 50,257) at a fixed context length of 512 tokens for 10,000 steps (AdamW, lr $3{\times}10^{-4}$, weight decay 0.1, warmup 1,000, cosine decay, fp16, seed 42). Batch size is 16 (micro-batch 8, gradient accumulation 2). We evaluate validation perplexity using sliding windows at each length.
 
 \subsection{Data Processing and Analysis Tools}
-The controlled experiment runs in PyTorch with fp16 mixed precision on a single NVIDIA T4 GPU (16\,GB). The zero-shot benchmark runs using PyTorch and Hugging Face \texttt{transformers}.
+The controlled experiment runs in PyTorch with fp16 mixed precision on a single NVIDIA T4 GPU (16\,GB). The zero-shot benchmark uses PyTorch and Hugging Face \texttt{transformers}.
 
 \section{Experimental Results}
 \label{sec:results}
@@ -167,7 +167,7 @@ The controlled experiment runs in PyTorch with fp16 mixed precision on a single 
 \subsection{Controlled Experiment}
 \label{sec:controlled}
 
-\paragraph{Setup.} Seven transformer architectures ($\sim$17.6M parameters: $d{=}256$, 6 layers, 4 heads, $d_{\text{head}}{=}64$, $d_{\text{ff}}{=}1024$, vocab 50,257) train from scratch on WikiText-103 at a fixed context length of 512 tokens. The only difference between models is the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, or NoPE. Position Interpolation and YaRN are evaluated as inference-time extensions of the trained RoPE checkpoint with no additional training. KERPLE adds only $+4$ parameters; CABLE adds $+2{,}081$ ($\ll$0.1\% of the model). All reported values come from the best validation perplexity checkpoint saved during training.
+\paragraph{Setup.} Seven transformer architectures ($\sim$17.6M parameters: $d{=}256$, 6 layers, 4 heads, $d_{\text{head}}{=}64$, $d_{\text{ff}}{=}1024$, vocab 50,257) train from scratch on WikiText-103 at a fixed context length of 512 tokens. The positional encoding is the only difference: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, or NoPE. Position Interpolation and YaRN reuse the trained RoPE checkpoint with no additional training. KERPLE adds $+4$ parameters; CABLE adds $+2{,}081$ ($\ll$0.1\% of the model). We save the best validation perplexity checkpoint during training.
 
 \paragraph{Perplexity extrapolation.} Table~\ref{tab:controlled_ppl} and Figure~\ref{fig:controlled_ppl} report sliding-window perplexity on the WikiText-103 validation set.
 
@@ -216,32 +216,32 @@ YaRN & 1.59$\times$ & 67{,}063 & 0.015 & 197\,MB \\
 \end{tabular*}
 \end{table}
 
-At $L{=}512$ (within the training window), KERPLE achieves the lowest perplexity (329.0), followed by RoPE (336.7) and ALiBi (358.9). Sinusoidal (356.0) and Learned (360.2) are comparable; NoPE (367.0), CABLE (377.7), and YaRN (401.0) are somewhat higher. PI (632.0) reflects position compression: PI maps the 8,192-token eval range onto the 512-token training range by dividing position indices by 16, so even at $L{=}512$ the model sees compressed positions $[0, 1/16, \ldots, 511/16]$ rather than $[0, 1, \ldots, 511]$, degrading in-window perplexity in exchange for extrapolation headroom.
+At $L{=}512$ (within the training window), KERPLE achieves the lowest perplexity (329.0), followed by RoPE (336.7) and ALiBi (358.9). Sinusoidal (356.0) and Learned (360.2) cluster nearby. NoPE (367.0), CABLE (377.7), and YaRN (401.0) rank lower. PI (632.0) reflects position compression: PI maps the 8,192-token eval range onto the 512-token training range by dividing position indices by 16, so even at $L{=}512$ the model sees compressed positions $[0, 1/16, \ldots, 511/16]$ rather than $[0, 1, \ldots, 511]$, degrading in-window perplexity to gain extrapolation headroom.
 
-Beyond the training window, the methods diverge. Table~\ref{tab:cost} shows the extrapolation ratio (PPL at $L{=}8192$ divided by PPL at $L{=}512$). ALiBi and CABLE are essentially flat (ratio $\approx$1.0): ALiBi's static distance penalty $m_h \cdot |i{-}j|$ is defined at any pairwise distance by construction, so longer contexts leave the attention profile unchanged. CABLE's learned linear bias achieves the same effect through a small shared network. NoPE (1.27$\times$) and KERPLE (1.30$\times$) degrade mildly. YaRN (1.59$\times$) degrades moderately---its NTK-aware frequency blending partially preserves high-frequency information but does not fully resolve extrapolation. Learned (1.76$\times$) and RoPE (2.11$\times$) degrade sharply: Learned has no representation beyond position 511, and RoPE's high-frequency dimensions oscillate beyond the training range. Sinusoidal fails catastrophically (822$\times$): while sinusoidal functions are defined at any position, the model never learns to use this structure, and attention scores collapse at unseen positions.
+Beyond the training window, the methods diverge. Table~\ref{tab:cost} shows the extrapolation ratio (PPL at $L{=}8192$ divided by PPL at $L{=}512$). ALiBi and CABLE stay flat (ratio $\approx$1.0): ALiBi's distance penalty $m_h \cdot |i{-}j|$ is defined at any pairwise distance, so longer contexts leave the attention profile unchanged. CABLE's learned linear bias achieves the same effect through a small shared network. NoPE (1.27$\times$) and KERPLE (1.30$\times$) degrade modestly. YaRN (1.59$\times$) degrades further, its NTK-aware frequency blending partially preserving high-frequency information without fully resolving extrapolation. Learned (1.76$\times$) and RoPE (2.11$\times$) degrade more than 2$\times$: Learned has no representation beyond position 511, and RoPE's high-frequency dimensions oscillate past the training range. Sinusoidal collapses above 800$\times$: sinusoidal functions are defined at any position, but the model does not learn to use this structure, and attention scores fail at unseen positions.
 
-\paragraph{Needle retrieval.} All nine methods score 0\% retrieval accuracy at every context depth and every evaluated length (Figure~\ref{fig:needle}). This uniform failure is capacity-bound: at 17.6M parameters, the model lacks the capacity to reliably retrieve specific information from long contexts regardless of positional encoding. The same task succeeds on larger pre-trained models (124M--559M parameters) within their training windows \cite{press2022}. We caution against interpreting needle results at this scale as evidence about positional encoding extrapolation.
+\paragraph{Needle retrieval.} All nine methods score 0\% at every context depth and every evaluated length (Figure~\ref{fig:needle}). At 17.6M parameters, the models lack capacity to retrieve specific information from long contexts regardless of positional encoding. Larger pre-trained models (124M--559M parameters) retrieve needles within their training windows \cite{press2022}. Needle results at this scale do not reflect extrapolation quality.
 
-\paragraph{Inference cost.} Table~\ref{tab:cost} reports latency and VRAM. All methods except ALiBi have comparable VRAM ($\sim$195\,MB) and latency ($\sim$0.015\,ms/token). ALiBi's precomputed bias tensor ($4 \times 8192 \times 8192$ float32 for 4 heads) consumes 1.26\,GB, a $6.5\times$ overhead. This is a fixed architectural cost that scales with the maximum evaluated sequence length, not a training cost.
+\paragraph{Inference cost.} Table~\ref{tab:cost} reports latency and VRAM. All methods except ALiBi share comparable VRAM ($\sim$195\,MB) and latency ($\sim$0.015\,ms/token). ALiBi's precomputed bias tensor ($4 \times 8192 \times 8192$ float32 for 4 heads) consumes 1.26\,GB, a $6.5\times$ overhead. This is a fixed architectural cost scaling with maximum evaluated sequence length.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{figures/ppl_curves.pdf}
-\caption{Controlled experiment: perplexity versus context length. ALiBi and CABLE remain flat through $L{=}8192$; NoPE, KERPLE, and YaRN degrade moderately; Learned and RoPE degrade sharply; Sinusoidal fails catastrophically beyond $L{=}512$.}
+\caption{Controlled experiment: perplexity versus context length. ALiBi and CABLE stay flat through $L{=}8192$; NoPE, KERPLE, and YaRN degrade modestly; Learned and RoPE degrade 2$\times$ or more; Sinusoidal fails above $L{=}512$.}
 \label{fig:controlled_ppl}
 \end{figure}
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{figures/needle_heatmaps.pdf}
-\caption{Needle retrieval: 0\% across all controlled models at 17.6M parameters, indicating capacity-bound retrieval independent of the positional encoding.}
+\caption{Needle retrieval: 0\% across all models at 17.6M parameters, a capacity-bound failure independent of positional encoding.}
 \label{fig:needle}
 \end{figure}
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{figures/extrapolation_ratio.pdf}
-\caption{Perplexity degradation ratio (PPL at $L{=}8192$ / PPL at $L{=}512$). ALiBi and CABLE maintain ratio $\approx$1.0; Sinusoidal exceeds 800$\times$ (truncated for readability).}
+\caption{Perplexity degradation ratio (PPL at $L{=}8192$ / PPL at $L{=}512$). ALiBi and CABLE stay at $\approx$1.0; Sinusoidal exceeds 800$\times$ (truncated for readability).}
 \label{fig:extrapolation}
 \end{figure}
 
@@ -268,29 +268,29 @@ All three pre-trained models retrieve the needle successfully at 124M--559M para
 
 \subsection{Limitations}
 
-Several limitations constrain interpretation. First, all controlled models are small ($\sim$17.6M parameters); extrapolation behavior may differ at larger scales where models have sufficient capacity to learn positional structure. Second, we evaluate only on WikiText-103; results may differ on other domains. Third, PI and YaRN inherit the RoPE checkpoint's training trajectory, so their evaluation is confounded by the base model's quality. Fourth, Sinusoidal's catastrophic failure at unseen positions may reflect insufficient training rather than an inherent limitation of sinusoidal functions; a longer training schedule could potentially change this result.
+Three limitations constrain interpretation. All controlled models are small ($\sim$17.6M parameters); extrapolation behavior may differ at larger scales where models learn positional structure more fully. We evaluate only on WikiText-103; other domains may produce different rankings. PI and YaRN inherit the RoPE checkpoint's training trajectory, so their evaluation is confounded by the base model's quality.
 
 \section{Discussion}
 
-The nine-method comparison reveals a clear hierarchy of extrapolation stability:
+The nine-method comparison shows a hierarchy of extrapolation stability:
 
 \begin{enumerate}
-\item \textbf{Near-perfect stability} (ratio $\approx$1.0): ALiBi and CABLE. Both use distance-based biases defined at any pairwise position by construction. ALiBi's bias is fixed (no learned parameters); CABLE's is learned through a small network.
-\item \textbf{Mild degradation} (1.1--1.3$\times$): PI, NoPE, and KERPLE. PI trades in-window quality for extrapolation headroom via position compression. NoPE's surprisingly good extrapolation (1.27$\times$) suggests the causal mask provides implicit positional information sufficient for moderate extrapolation.
-\item \textbf{Moderate degradation} (1.3--2.1$\times$): YaRN, Learned, and RoPE. YaRN's NTK-aware blending helps but does not fully resolve extrapolation. Learned embeddings have no representation past position 511. RoPE's high-frequency dimensions oscillate beyond the training range.
-\item \textbf{Catastrophic failure} ($>$800$\times$): Sinusoidal. Despite being mathematically defined at any position, the model fails to learn the sinusoidal structure at this scale.
+\item \textbf{Flat} (ratio $\approx$1.0): ALiBi and CABLE. Both use distance-based biases defined at any pairwise position. ALiBi's bias is fixed; CABLE's is learned through a small network.
+\item \textbf{Modest degradation} (1.1--1.3$\times$): PI, NoPE, and KERPLE. PI trades in-window quality for extrapolation headroom via position compression. NoPE's good extrapolation (1.27$\times$) suggests the causal mask provides implicit positional information sufficient for moderate extrapolation.
+\item \textbf{Significant degradation} (1.3--2.1$\times$): YaRN, Learned, and RoPE. YaRN's NTK-aware blending helps but does not fully resolve extrapolation. Learned embeddings have no representation past position 511. RoPE's high-frequency dimensions oscillate past the training range.
+\item \textbf{Failure} ($>$800$\times$): Sinusoidal. Defined at any position, but the model does not learn the structure at this scale.
 \end{enumerate}
 
-The cost--stability trade-off is most pronounced for ALiBi: it achieves the best extrapolation stability but requires $6.5\times$ more VRAM than all other methods due to its precomputed bias buffer. For deployment scenarios with tight memory budgets, CABLE offers comparable stability at standard memory cost, while NoPE eliminates positional encoding overhead entirely at the cost of modest degradation.
+The cost--stability trade-off is starkest for ALiBi: the best extrapolation stability, but $6.5\times$ more VRAM than all other methods due to its precomputed bias buffer. For tight memory budgets, CABLE offers comparable stability at standard cost, and NoPE eliminates positional encoding overhead entirely at modest degradation.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-We compared nine positional encoding methods trained from scratch on WikiText-103: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, Position Interpolation, and YaRN. Our controlled experiment isolates the positional encoding as the sole variable at 17.6M parameters, evaluated up to $16\times$ the training context length.
+We compared nine positional encoding methods trained from scratch on WikiText-103: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, Position Interpolation, and YaRN. We kept model size, training data, and architecture fixed, isolating the positional encoding as the sole variable at 17.6M parameters, evaluated up to $16\times$ the training context length.
 
-Three findings emerge. First, extrapolation stability spans a wide continuum: ALiBi and CABLE remain essentially flat (ratio $\approx$1.0), while Sinusoidal fails catastrophically ($>$800$\times$), with all other methods falling between these extremes. Second, needle retrieval fails uniformly (0\%) at this model scale, indicating a capacity-bound failure independent of positional encoding. Third, ALiBi's extrapolation stability comes at a VRAM cost ($1.26$\,GB) that is $6.5\times$ the footprint of all other methods.
+Three findings. Extrapolation stability spans a wide range: ALiBi and CABLE stay flat (ratio $\approx$1.0), while Sinusoidal fails above 800$\times$, with all other methods between these extremes. Needle retrieval fails uniformly (0\%) at this scale, a capacity-bound failure independent of positional encoding. ALiBi's extrapolation stability costs 1.26\,GB of VRAM, $6.5\times$ the footprint of every other method.
 
-These findings confirm that ALiBi provides length extrapolation without fine-tuning in this setup, but also reveal that the extrapolation landscape is richer than a simple three-way comparison suggests: NoPE, KERPLE, and CABLE offer alternative trade-off points between stability, in-window performance, and memory cost.
+The extrapolation landscape is richer than a three-way comparison suggests: NoPE, KERPLE, and CABLE offer alternative trade-off points between stability, in-window performance, and memory cost.
 
 \begin{thebibliography}{00}
 
