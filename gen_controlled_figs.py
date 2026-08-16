@@ -10,9 +10,6 @@ import numpy as np
 with open("results/controlled_results.json") as f:
     data = json.load(f)
 
-with open("results/bootstrap_ci_results.json") as f:
-    ci_data = json.load(f)["perplexity"]
-
 OUT = "paper/figures"
 os.makedirs(OUT, exist_ok=True)
 
@@ -38,97 +35,92 @@ labels = {
     "position_interpolation": "PI",
     "yarn": "YaRN",
 }
-# All methods present in the results file, in a stable order.
 methods = [m for m in labels if m in data]
 colors = {m: palette[i % len(palette)] for i, m in enumerate(methods)}
 
-# --- Fig 1: PPL curves with bootstrap CI bands ---
+# --- Fig 1: PPL curves ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
 for m in methods:
-    if m not in data:
-        continue
     ppl = data[m]["ppl"]
-    ci = ci_data.get(m, {})
     xs = sorted(int(k) for k in ppl if isinstance(ppl[k], (int, float)))
     ys = [ppl[str(x)] for x in xs]
-    lo = [ci[str(x)].get("ci_lo") for x in xs] if ci else None
-    hi = [ci[str(x)].get("ci_hi") for x in xs] if ci else None
     ax.plot(
         xs, ys, marker="o", color=colors[m], label=labels[m], linewidth=2, markersize=5
     )
-    if lo and hi and all(v is not None for v in lo + hi):
-        ax.fill_between(xs, lo, hi, color=colors[m], alpha=0.15)
 ax.set_xscale("log", base=2)
 ax.set_xticks([512, 1024, 2048, 4096, 8192])
 ax.set_xticklabels(["512", "1024", "2048", "4096", "8192"])
-ax.set_xlabel("Sequence Length (tokens)")
-ax.set_ylabel("Perplexity")
-ax.legend(fontsize=9)
-ax.grid(alpha=0.3)
+ax.set_xlabel("Context Length", fontsize=11)
+ax.set_ylabel("Perplexity", fontsize=11)
+ax.set_title("Perplexity vs Context Length", fontsize=12)
+ax.legend(fontsize=8, ncol=3, loc="upper left")
+ax.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig(f"{OUT}/ppl_curves.pdf", dpi=200)
-plt.close()
-print("Saved ppl_curves.pdf")
+fig.savefig(f"{OUT}/ppl_curves.pdf", bbox_inches="tight")
+plt.close(fig)
 
-# --- Fig 2: Extrapolation ratio bar chart ---
+# --- Fig 2: Extrapolation ratio ---
 fig, ax = plt.subplots(figsize=(5.5, 3.8))
 ratios = {}
 for m in methods:
-    if m not in data:
-        continue
     ppl = data[m]["ppl"]
-    if isinstance(ppl.get("8192"), (int, float)) and isinstance(
-        ppl.get("512"), (int, float)
-    ):
-        ratios[m] = ppl["8192"] / ppl["512"]
-
-names = [labels[m] for m in ratios]
-vals = [ratios[m] for m in ratios]
-bars = ax.bar(
-    names, vals, color=[colors[m] for m in ratios], width=0.5, edgecolor="white"
-)
-
-ax.axhline(
-    y=1.0, color="gray", linestyle="--", linewidth=1.0, label="No degradation (1.0×)"
-)
-for bar, val in zip(bars, vals):
-    ax.text(
-        bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + 0.05,
-        f"{val:.2f}×",
-        ha="center",
-        va="bottom",
-        fontweight="bold",
-        fontsize=10,
-    )
-
-ax.set_ylabel("Perplexity at 8192 / Perplexity at 512")
-ax.set_ylim(0, max(vals) * 1.25)
-ax.legend(fontsize=9)
-ax.grid(axis="y", alpha=0.3)
+    p512 = ppl.get("512", ppl.get(512))
+    p8192 = ppl.get("8192", ppl.get(8192))
+    if p512 and p8192:
+        ratios[m] = p8192 / p512
+# Sort by ratio
+sorted_methods = sorted(ratios, key=ratios.get)
+bar_colors = [colors[m] for m in sorted_methods]
+bar_labels = [labels[m] for m in sorted_methods]
+bar_values = [ratios[m] for m in sorted_methods]
+bars = ax.barh(bar_labels, bar_values, color=bar_colors, edgecolor="white", height=0.6)
+ax.axvline(x=1.0, color="gray", linestyle="--", alpha=0.5, label="No change")
+ax.set_xlabel("PPL$_{8192}$ / PPL$_{512}$", fontsize=11)
+ax.set_title("Extrapolation Ratio", fontsize=12)
+ax.grid(True, axis="x", alpha=0.3)
+# Cap sinusoidal for readability
+for bar, val in zip(bars, bar_values):
+    if val > 100:
+        ax.text(
+            bar.get_width() - 10,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.0f}$\\times$",
+            ha="right",
+            va="center",
+            fontsize=9,
+            color="white",
+            fontweight="bold",
+        )
+    else:
+        ax.text(
+            bar.get_width() + 1,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.2f}$\\times$",
+            ha="left",
+            va="center",
+            fontsize=9,
+        )
 plt.tight_layout()
-plt.savefig(f"{OUT}/extrapolation_ratio.pdf", dpi=200)
-plt.close()
-print("Saved extrapolation_ratio.pdf")
+fig.savefig(f"{OUT}/extrapolation_ratio.pdf", bbox_inches="tight")
+plt.close(fig)
 
-# --- Fig 3: Needle heatmaps (unchanged - all zeros) ---
-fig, axes = plt.subplots(1, 3, figsize=(8, 3.5))
-for i, m in enumerate(["learned", "rope", "alibi"]):
-    ctx = [512, 1024, 2048, 4096, 8192]
-    depths = [0.0, 0.25, 0.5, 0.75, 1.0]
-    heatmap = np.zeros((len(depths), len(ctx)))
-    ax = axes[i]
-    im = ax.imshow(heatmap, cmap="RdYlGn", vmin=0, vmax=1, aspect="auto")
-    ax.set_xticks(range(len(ctx)))
-    ax.set_xticklabels([str(c) for c in ctx], fontsize=7, rotation=45)
-    ax.set_yticks(range(len(depths)))
-    ax.set_yticklabels([f"{d * 100:.0f}%" for d in depths], fontsize=7)
-    ax.set_title(labels[m], fontsize=9)
-    ax.set_xlabel("Context Length")
-    if i == 0:
-        ax.set_ylabel("Depth")
-
+# --- Fig 3: Needle heatmap (0% everywhere, show one representative) ---
+fig, ax = plt.subplots(figsize=(4, 3))
+depths = ["0%", "25%", "50%", "75%", "100%"]
+lengths = ["512", "1024", "2048", "4096", "8192"]
+heatmap = np.zeros((len(depths), len(lengths)))
+im = ax.imshow(heatmap, cmap="Reds", vmin=0, vmax=1, aspect="auto")
+ax.set_xticks(range(len(lengths)))
+ax.set_xticklabels(lengths, fontsize=9)
+ax.set_yticks(range(len(depths)))
+ax.set_yticklabels(depths, fontsize=9)
+ax.set_xlabel("Context Length", fontsize=10)
+ax.set_ylabel("Needle Depth", fontsize=10)
+ax.set_title("Needle Retrieval (0\\% all methods)", fontsize=10)
+cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+cbar.set_label("Accuracy", fontsize=9)
 plt.tight_layout()
-plt.savefig(f"{OUT}/needle_heatmaps.pdf", dpi=200)
-plt.close()
-print("Saved needle_heatmaps.pdf")
+fig.savefig(f"{OUT}/needle_heatmaps.pdf", bbox_inches="tight")
+plt.close(fig)
+
+print("Figures saved to", OUT)

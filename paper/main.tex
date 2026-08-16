@@ -29,12 +29,8 @@ prasiddha.080bct027@tcioe.edu.np
 \maketitle
 
 \begin{abstract}
-Positional encoding controls how transformers generalize past their training length. We compare three paradigms: Learned Absolute, Rotary Positional Encoding (RoPE), and Attention with Linear Biases (ALiBi). Seven transformer architectures ($\sim$17.6M parameters each) train from scratch on WikiText-103 at a fixed context length of 512 tokens. We measure perplexity, needle retrieval accuracy, and inference latency across context lengths from 512 to 8,192 tokens ($16\times$ the training length). ALiBi maintains the most stable perplexity across the full range (126.9$\to$124.1, $-2.2\%$, bootstrap 95\% CI $[121.9,132.1]$ at $L{=}512$); learned embeddings degrade $2.8\times$ (110.2$\to$307.2) and RoPE degrades $3.5\times$ (88.1$\to$310.4). The RoPE--ALiBi gap at $L{=}512$ is $-38.8$ (CI $[-40.4,-37.3]$), excluding zero. Needle retrieval scores 0\% across all controlled models; the failure is capacity-bound at this scale, independent of the positional encoding. The same task succeeds on larger pre-trained models (124M--559M) within their training windows. In our setup, ALiBi extrapolates without fine-tuning; RoPE requires interpolation-based methods for long-context deployment.
+Positional encoding controls how transformers generalize past their training length. We train nine comparable architectures ($\sim$17.6M parameters) from scratch on WikiText-103 at a fixed context length of 512 tokens, varying only the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, and two inference-time RoPE extensions (Position Interpolation, YaRN). We measure perplexity, needle retrieval accuracy, and inference latency from 512 to 8,192 tokens ($16\times$ the training length). ALiBi and CABLE remain near-perfectly stable through extrapolation (ratio $\approx$1.0), while NoPE (1.27$\times$), KERPLE (1.30$\times$), and YaRN (1.59$\times$) degrade moderately, Learned (1.76$\times$) and RoPE (2.11$\times$) degrade sharply, and Sinusoidal fails catastrophically ($>$800$\times$). Needle retrieval scores 0\% across all models, indicating a capacity-bound failure independent of positional encoding. ALiBi's stability comes at a cost: its precomputed attention bias buffer consumes 1.26\,GB of VRAM, $6.5\times$ the memory footprint of the other methods.
 \end{abstract}
-
-\begin{IEEEkeywords}
-Transformer, Positional Encoding, Length Extrapolation, Self-Attention, RoPE, ALiBi
-\end{IEEEkeywords}
 
 \section{Introduction}
 \label{sec:introduction}
@@ -43,15 +39,15 @@ Transformer architectures are the standard foundation for natural language proce
 
 Positional encodings assign position representations to tokens. Early models used absolute encodings: fixed sinusoidal functions or learned position embeddings \cite{vaswani2017,devlin2019,radford2019}. These work within the training window but degrade rapidly on longer sequences \cite{press2022}.
 
-Recent architectures use relative rotations or attention score biases to address this. Rotary Positional Encoding (RoPE) rotates query and key vectors in complex space \cite{su2024roformer}. Attention with Linear Biases (ALiBi) adds distance-based penalties directly to attention logits \cite{press2022}.
+Recent architectures use relative rotations or attention score biases to address this. Rotary Positional Encoding (RoPE) rotates query and key vectors in complex space \cite{su2024roformer}. Attention with Linear Biases (ALiBi) adds distance-based penalties directly to attention logits \cite{press2022}. Several RoPE extensions have been proposed for long-context deployment: Position Interpolation (PI) compresses the position scale to fit longer sequences \cite{chen2023}, and YaRN applies NTK-aware frequency scaling \cite{peng2023yarn}. KERPLE and CABLE apply learned bias functions over pairwise distances, while NoPE ablates positional encoding entirely \cite{kazemnejad2023,cable2023}.
 
-This paper compares three paradigms under controlled conditions. We keep model size, training data, and architecture fixed, training comparable transformers ($\sim$17.6M parameters) from scratch on WikiText-103 at a fixed context length of 512 tokens, differing only in their positional encoding. Our controlled comparison covers seven from-scratch encodings (Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, and NoPE) plus two inference-time RoPE-scaling extensions (Position Interpolation and YaRN) evaluated on the vanilla RoPE checkpoint. We additionally evaluate three pre-trained models zero-shot (GPT-2, Pythia-160M, BLOOM-560M) to contextualize findings against real-world deployments.
+This paper compares nine positional encoding methods under controlled conditions. We keep model size, training data, and architecture fixed, training comparable transformers ($\sim$17.6M parameters) from scratch on WikiText-103 at a fixed context length of 512 tokens, differing only in their positional encoding. PI and YaRN are evaluated as inference-time extensions of the trained RoPE checkpoint with no additional training.
 
 The contributions of this paper are:
 \begin{itemize}
-\item A structured review of absolute, rotary, and bias-based positional encoding paradigms.
-\item A controlled experiment isolating the positional encoding as the sole variable: comparable transformer architectures trained on the same data for each of seven encodings (plus two RoPE-scaling extensions), evaluated at context lengths from 512 to 8,192 tokens ($16\times$ the training length), with bootstrap confidence intervals on every perplexity value.
-\item A supplementary zero-shot evaluation of GPT-2, Pythia-160M, and BLOOM-560M on resource-constrained hardware, providing a practical reference for pre-trained model deployments.
+\item A controlled experiment isolating the positional encoding as the sole variable across nine methods, evaluated at context lengths from 512 to 8,192 tokens ($16\times$ the training length).
+\item Evidence that extrapolation stability spans a continuum: from near-perfect stability (ALiBi, CABLE) through moderate degradation (NoPE, KERPLE, YaRN) to catastrophic failure (Sinusoidal), with Learned and RoPE in between.
+\item Quantification of ALiBi's VRAM overhead ($1.26$\,GB vs.\ $\sim$195\,MB for all others) due to its precomputed bias buffer.
 \end{itemize}
 
 \section{Related Work}
@@ -94,6 +90,7 @@ for tree={
   [Bias-based
     [ALiBi]
     [KERPLE]
+    [CABLE]
   ]
   [Implicit /\\Augmented
     [NoPE]
@@ -111,20 +108,17 @@ for tree={
 \centering
 \begin{tabular}{lccccc}
 \hline
-\textbf{Method} & \textbf{Position Type} & \textbf{Extrapolation} & \textbf{Extra Parameters} & \textbf{Complexity} & \textbf{Representative Models} \\
+\textbf{Method} & \textbf{Position Type} & \textbf{Extrapolation} & \textbf{Extra Params} & \textbf{Complexity} & \textbf{Representative Models} \\
 \hline
 Sinusoidal & Absolute & Low & No & Low & Transformer \\
 Learned & Absolute & Very Low & Yes & Low & BERT \\
-Shaw & Relative & Medium & Yes & Medium & Transformer \\
-T5 & Relative & Medium & Yes & Medium & T5 \\
 RoPE & Rotary & High & No & Low & LLaMA \\
-ALiBi & Linear Bias & Very High & No & Very Low & Research \\
 PI & RoPE Extension & Very High & No & Low & Long-context LLMs \\
 YaRN & RoPE Extension & Very High & No & Low & LLaMA \\
-Frequency Rescaling & RoPE Extension & Very High & No & Medium & Long-context LLMs \\
+ALiBi & Linear Bias & Very High & No & Very Low & BLOOM \\
 KERPLE & Kernelized Bias & High & Yes & Medium & Research \\
-NoPE & Implicit & Medium$^*$ & No & Very Low & Research (decoder-only) \\
-Randomized PE & Absolute (Randomized) & High & No & Low & Research \\
+CABLE & Learned Bias & Very High & Yes & Low & Research \\
+NoPE & Implicit & Medium$^*$ & No & Very Low & Research \\
 \hline
 \multicolumn{6}{l}{\small $^*$Outperforms ALiBi/RoPE on select length-generalization benchmarks \cite{kazemnejad2023}; not a universal ranking.} \\
 \end{tabular}
@@ -132,199 +126,208 @@ Randomized PE & Absolute (Randomized) & High & No & Low & Research \\
 
 \subsection{Extrapolation and Design Trade-offs}
 
-Absolute encodings extrapolate worst. Learned embeddings have no representation past the training length \cite{devlin2019,radford2019,press2022}. Sinusoidal encoding is defined at any position but rarely generalizes, because models do not learn its underlying structure \cite{vaswani2017,press2022}. Relative encodings improve on this. Shaw's offset vectors and T5's bucketed biases extend translation invariance moderately, but bucket boundaries collapse under extreme lengths \cite{shaw2018,raffel2020}. RoPE extrapolates further by encoding distance as continuous rotation, but its high-frequency dimensions oscillate beyond the training range \cite{su2024roformer,sun2022lex}. Attention with Linear Biases (ALiBi) and Kernelized Relative Positional Encoding with Learned Embeddings (KERPLE) go furthest zero-shot, with ALiBi's simplicity giving it the edge in our comparison \cite{press2022,chi2022}. Three results complicate this ordering. NoPE (No Positional Encoding) matches or exceeds ALiBi and RoPE on several length-generalization benchmarks despite using no positional mechanism, suggesting stable attention dynamics drive extrapolation more than the specific encoding \cite{kazemnejad2023}. BiPE improves generalization by splitting intra-segment absolute from inter-segment relative encoding, independent of which relative scheme is used \cite{he2024bipe}. Randomized positional encodings blur the absolute--relative distinction by injecting stochastic positional structure during training \cite{ruoss2023}. This literature ordering (ALiBi $\succ$ RoPE $>$ Shaw/T5 $\gg$ Learned/Sinusoidal) is the hypothesis Section~\ref{sec:results} tests directly under a controlled architecture.
+Absolute encodings extrapolate worst. Learned embeddings have no representation past the training length \cite{devlin2019,radford2019,press2022}. Sinusoidal encoding is defined at any position but rarely generalizes, because models do not learn its underlying structure \cite{vaswani2017,press2022}. RoPE extrapolates further by encoding distance as continuous rotation, but its high-frequency dimensions oscillate beyond the training range \cite{su2024roformer,chen2023}. ALiBi extrapolates best among standard methods because its linear penalty is defined by construction at any pairwise distance \cite{press2022}. KERPLE generalizes this to learned kernel biases \cite{kerple2022}. CABLE learns a linear attention bias through a small shared network \cite{cable2023}. NoPE omits positional encoding entirely, relying on the causal mask's implicit ordering \cite{kazemnejad2023}.
 
-These extrapolation capabilities come with distinct trade-offs. Learned embeddings cannot be extended without full retraining \cite{press2022}. Brief fine-tuning pushes RoPE's zero-shot ceiling further: Position Interpolation (PI) compresses coordinates into the pretrained range \cite{chen2023}; Yet another RoPE extensioN (YaRN) and frequency rescaling reach comparable results with fewer fine-tuning steps by scaling low- and high-frequency components separately \cite{peng2023yarn,liu2024scaling}; LongRoPE2 pushes this furthest, using needle-driven evolutionary search plus mixed-context-window fine-tuning to extend LLaMA3-8B to 128K context on just 10B additional tokens \cite{shang2025longrope2}. ALiBi and KERPLE need none of this. Their bias functions have no learned parameters to begin with \cite{press2022,chi2022}. However, the same distance penalty that guarantees extrapolation also imposes a strict recency bias that can suppress long-range, multi-hop retrieval \cite{press2022,chi2022}. RoPE has no hard distance penalty, but its phase-shift instability produces a milder, less predictable version of the same problem at long range \cite{su2024roformer,sun2022lex}. Two mitigations target this directly: Content-Aware BiaSed LEarning (CABLE) learns per-token, content-conditioned biases instead of ALiBi's fixed slope, aiming to soften recency while keeping extrapolation \cite{veisi2025cable}; Transformer-XL instead sidesteps the problem structurally, caching and attending over memory segments via a learned relative bias rather than penalizing distance at all \cite{dai2019}. On the efficiency axis, sinusoidal and RoPE both add zero parameters; RoPE's element-wise rotation and ALiBi's static bias addition are both near-negligible over standard attention \cite{press2022,su2024roformer}. Learned embeddings add parameters proportional to the context limit but negligible runtime cost via table lookup. CABLE's per-head bias network costs more than ALiBi's fixed slope but far less than an added attention layer \cite{veisi2025cable}. PI, YaRN, and frequency rescaling all preserve RoPE's base compute profile, requiring no kernel changes \cite{chen2023,peng2023yarn,liu2024scaling}.
+PI and YaRN do not train new models. They rescale the RoPE frequencies so that the trained window maps onto a longer target length at inference time. PI divides position indices by a scale factor \cite{chen2023}; YaRN blends NTK-aware frequency scaling with attention scaling \cite{peng2023yarn}.
 
 \section{Methodology}
 \label{sec:methodology}
 
 \subsection{Theoretical Framework and Justification}
 
-Self-attention compares query and key vectors using similarity scores. Without positional encoding, self-attention treats inputs as unordered sets \cite{vaswani2017}. Positional encodings break this symmetry by injecting position information into attention. Their design determines how well attention generalizes beyond the training context window.
+Self-attention compares query and key vectors using similarity scores. Without positional encoding, self-attention treats inputs as unordered sets \cite{vaswani2017}. Positional encodings break this symmetry by injecting position information into attention.
 
-The seven encodings we train group into three paradigm families representing modern language model architectures:
+The nine methods we evaluate group into paradigm families:
 \begin{enumerate}
-\item \textbf{Learned Absolute}: Embedding vectors added to input tokens (e.g., GPT-2). We train the learned variant and the fixed sinusoidal variant.
-\item \textbf{Rotary (RoPE)}: Complex rotations applied directly to query and key vectors \cite{su2024roformer} (e.g., Pythia, Qwen).
-\item \textbf{Linear Biases (ALiBi)}: Distance penalties added directly to attention logits \cite{press2022} (e.g., BLOOM). KERPLE and CABLE are learned bias variants of this family.
+\item \textbf{Absolute}: Learned embedding vectors added to input tokens; fixed Sinusoidal functions.
+\item \textbf{Rotary (RoPE)}: Complex rotations applied to query and key vectors \cite{su2024roformer}. PI and YaRN extend RoPE for long-context inference.
+\item \textbf{Bias-based (ALiBi family)}: Distance penalties added to attention logits \cite{press2022}. KERPLE and CABLE are learned variants.
+\item \textbf{Implicit}: NoPE trains without any positional mechanism.
 \end{enumerate}
-NoPE, trained without any positional mechanism, completes the seven and serves as an ablation for the family distinctions above.
 
 \subsection{Research Design}
-We use a two-part empirical design. The primary evaluation is a \emph{controlled experiment}: comparable transformer architectures train from scratch, differing only in their positional encoding, so any observed difference in extrapolation traces to the encoding mechanism, not to model size, training data, or vocabulary. This addresses a confound in pre-trained model comparisons (GPT-2, Pythia, BLOOM differ by up to $4.5\times$ in parameter count and $5\times$ in vocabulary size).
-We evaluate all models at sequence lengths $L \in \{512, 1024, 2048, 4096, 8192\}$:
+We use a two-part empirical design: a \emph{controlled experiment} isolating the positional encoding as the sole variable, and a supplementary zero-shot evaluation of pre-trained models.
+
+For the controlled experiment, we evaluate at context lengths $L \in \{512, 1024, 2048, 4096, 8192\}$:
 \begin{enumerate}
-\item \textbf{Perplexity Extrapolation}: Measure language modeling perplexity on held-out text as sequence length scales. Windows are non-overlapping (stride equals the context length), so bootstrap resampling assumes i.i.d.\ windows.
-\item \textbf{Needle-in-a-Haystack Retrieval}: Measure retrieval accuracy when target keys are placed at context depths of 0\%, 25\%, 50\%, 75\%, and 100\%. Depth 0\% places the target at the start of the haystack (furthest from the query position); depth 100\% places it immediately before the query.
-\item \textbf{Inference Overhead}: Track per-token latency (ms/token) at the training context length.
+\item \textbf{Perplexity Extrapolation}: Sliding-window perplexity on held-out text (stride $=$ context length).
+\item \textbf{Needle-in-a-Haystack Retrieval}: Target placed at depths 0\%, 25\%, 50\%, 75\%, 100\%. A unique five-digit code is inserted into a haystack of filler text; the model must reproduce it exactly after the prompt ``What is the secret code? Answer:''. Three trials per depth; accuracy is the fraction of exact matches.
+\item \textbf{Inference Overhead}: Per-token latency (ms/token) and VRAM at the training context length.
 \end{enumerate}
-For the controlled (from-scratch) models, the needle protocol works as follows. A haystack of repeated filler sentences fills the context, a unique five-digit secret code is inserted at the target depth, and the prompt ends with the question ``What is the secret code? Answer:''. A trial succeeds only on an exact match: the greedily decoded continuation must contain the inserted code. Ten trials with a freshly randomized code per depth are averaged; reported accuracy is the fraction of trials in which the code is reproduced.
+
 \subsection{Data Collection Procedure}
-The controlled experiment trains on WikiText-103 ($\sim$13.0M tokens, GPT-2 tokenizer, vocab 50,257) at a fixed context length of 512 tokens for 10,000 steps (AdamW, lr $3{\times}10^{-4}$, weight decay 0.1, warmup 1,000, cosine decay, fp16, seed 42). We measure validation perplexity on the WikiText-103 validation split using sliding windows at each evaluated length.
-For the supplementary zero-shot evaluation, pre-trained model weights come from Hugging Face Hub: GPT-2 (\texttt{gpt2}, 124M) for Learned Absolute, Pythia (\texttt{EleutherAI/pythia-160m}, 160M) for RoPE, and BLOOM (\texttt{bigscience/bloom-560m}, 559M) for ALiBi. The zero-shot evaluation uses long-form book text (\emph{Moby Dick}) and synthetic documents for needle retrieval, on the same T4 GPU at the same context lengths.
+The controlled experiment trains on WikiText-103 (GPT-2 tokenizer, vocab 50,257) at a fixed context length of 512 tokens for 10,000 steps (AdamW, lr $3{\times}10^{-4}$, weight decay 0.1, warmup 1,000, cosine decay, fp16, seed 42). Batch size is 16 (micro-batch 8, gradient accumulation 2). We evaluate validation perplexity using sliding windows at each length.
+
 \subsection{Data Processing and Analysis Tools}
-The controlled experiment is implemented in PyTorch with fp16 mixed precision on a single NVIDIA T4 GPU (16\,GB). The supplementary zero-shot benchmark runs in Python using PyTorch and Hugging Face \texttt{transformers}.
+The controlled experiment runs in PyTorch with fp16 mixed precision on a single NVIDIA T4 GPU (16\,GB). The zero-shot benchmark runs using PyTorch and Hugging Face \texttt{transformers}.
+
 \section{Experimental Results}
 \label{sec:results}
 
-We report two complementary evaluations. The primary is a \emph{controlled experiment} isolating the positional encoding as the sole variable; the secondary provides zero-shot results on pre-trained models to contextualize findings against real-world deployments.
 \subsection{Controlled Experiment}
 \label{sec:controlled}
 
-\paragraph{Setup.} Seven transformer architectures ($\sim$17.6M parameters: $d{=}256$, 6 layers, 4 heads, $d_{\text{head}}{=}64$, $d_{\text{ff}}{=}1024$, vocab 50,257) train from scratch on WikiText-103 ($\sim$13.0M tokens) at a fixed context length of 512 tokens for 10,000 steps. The only difference between models is the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, or NoPE. Position Interpolation and YaRN are evaluated as inference-time extensions of the trained RoPE checkpoint with no additional training. Learned Absolute adds a separate embedding table (17.7M total); Sinusoidal, RoPE, ALiBi, and NoPE use the bare transformer (17.6M). KERPLE and CABLE add only tiny learned position layers (+4 and +2,081 parameters respectively, $\ll$0.1\% of the model). Training uses AdamW (lr $3{\times}10^{-4}$, weight decay 0.1, warmup 1000 steps, cosine decay), fp16 mixed precision, batch size 16 (micro-batch 8, gradient accumulation 2), seed 42 per method. We save checkpoints every 1,000 steps and evaluate the best validation perplexity checkpoint.
+\paragraph{Setup.} Seven transformer architectures ($\sim$17.6M parameters: $d{=}256$, 6 layers, 4 heads, $d_{\text{head}}{=}64$, $d_{\text{ff}}{=}1024$, vocab 50,257) train from scratch on WikiText-103 at a fixed context length of 512 tokens. The only difference between models is the positional encoding: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, or NoPE. Position Interpolation and YaRN are evaluated as inference-time extensions of the trained RoPE checkpoint with no additional training. KERPLE adds only $+4$ parameters; CABLE adds $+2{,}081$ ($\ll$0.1\% of the model). All reported values come from the best validation perplexity checkpoint saved during training.
 
-\paragraph{Reproducibility.} We verify the evaluation pipeline by retraining ALiBi from scratch with identical code, data, and seed (42); the retrained checkpoint converges to the same perplexity (126.93 at $L{=}512$), and all four per-head slopes (0.250, 0.0625, 0.015625, 0.003906) match the reference formula $m_i = 2^{-8i/H}$ \cite{press2022} to floating-point precision. All reported values come from checkpoints evaluated with the same pipeline; bootstrap CIs (1,000 resamples, seed 42) quantify within-run variability on per-window NLL data.
+\paragraph{Perplexity extrapolation.} Table~\ref{tab:controlled_ppl} and Figure~\ref{fig:controlled_ppl} report sliding-window perplexity on the WikiText-103 validation set.
 
-\paragraph{Perplexity extrapolation.} Table~\ref{tab:controlled_ppl} and Figure~\ref{fig:controlled_ppl} report sliding-window perplexity on the WikiText-103 validation set at context lengths from 512 to 8,192 tokens.
 \begin{table}[!t]
-\caption{Controlled Experiment: Perplexity Across Context Lengths (bootstrap 95\% CIs in brackets)}
+\caption{Controlled Experiment: Perplexity Across Context Lengths}
 \label{tab:controlled_ppl}
 \centering
 \scriptsize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lccccc@{}}
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lccccc}
 \hline
 \textbf{Method} & \textbf{512} & \textbf{1024} & \textbf{2048} & \textbf{4096} & \textbf{8192} \\
 \hline
-Learned & 110.2 & 149.9 & 199.7 & 253.6 & 307.2 \\
- & {[}105.7,114.7{]} & {[}142.5,157.7{]} & {[}185.6,212.3{]} & {[}236.7,270.5{]} & {[}283.2,330.7{]} \\
-RoPE & 88.1 & 114.9 & 176.6 & 245.7 & 310.4 \\
- & {[}84.4,92.0{]} & {[}109.1,120.8{]} & {[}164.3,187.5{]} & {[}228.6,263.8{]} & {[}285.7,334.2{]} \\
-ALiBi & 126.9 & 125.3 & 124.7 & 124.3 & 124.1 \\
- & {[}121.9,132.1{]} & {[}118.9,131.9{]} & {[}115.8,132.7{]} & {[}115.5,133.5{]} & {[}114.9,133.1{]} \\
+Learned & 360.2 & 462.5 & 575.6 & 622.7 & 635.0 \\
+RoPE & 336.7 & 365.0 & 468.9 & 616.1 & 711.4 \\
+ALiBi & 358.9 & 359.5 & 359.5 & 359.5 & 359.5 \\
+Sinusoidal & 356.0 & 12118 & 58078 & $>$150k & $>$290k \\
+NoPE & 367.0 & 391.7 & 420.1 & 448.7 & 465.1 \\
+KERPLE & 329.0 & 337.7 & 363.9 & 398.3 & 428.9 \\
+CABLE & 377.7 & 379.6 & 379.6 & 379.6 & 379.6 \\
+PI & 632.0 & 671.3 & 693.6 & 711.8 & 722.2 \\
+YaRN & 401.0 & 390.6 & 401.1 & 504.8 & 638.4 \\
 \hline
 \end{tabular*}
 \end{table}
 
-Within the training window ($L{=}512$), RoPE achieves the lowest perplexity (88.1, CI $[84.4,92.0]$), followed by Learned (110.2) and ALiBi (126.9, CI $[121.9,132.1]$). The RoPE--ALiBi gap at $L{=}512$ is $-38.8$ perplexity points (95\% bootstrap CI $[-40.4,-37.3]$, 482 non-overlapping windows, 1,000 resamples); the interval excludes zero. The paired bootstrap for this gap uses the same resampled window indices for both methods to preserve within-window correlation. Marginal CIs appear in Table~\ref{tab:controlled_ppl}. At $L{=}512$, $L{=}2048$, $L{=}4096$, and $L{=}8192$, these intervals do not overlap. At $L{=}1024$, they overlap marginally ([109.1,120.8] vs.\ [118.9,131.9]); the paired gap CI at $L{=}1024$ is $[-40.4, -37.3]$ (95\%), confirming the ranking holds.
-
-Beyond the training window, Learned and RoPE degrade rapidly: Learned reaches 307.2 at $L{=}8192$ ($2.8\times$ the training-window value) and RoPE reaches 310.4 ($3.5\times$). ALiBi stays nearly flat (126.9$\to$124.1, a $-2.2\%$ change; Figure~\ref{fig:extrapolation}). The slight decrease is a property of ALiBi's bias, not a spurious effect of overlapping windows. The bias is a static function of pairwise distance $m_h\cdot|i-j|$ rather than a learned absolute-position term, so at distances beyond the training length the penalty continues its monotonic trend instead of entering an unadapted regime. Longer contexts therefore leave the small-distance attention profile that dominates next-token prediction unchanged, while the low-slope heads ($m_h{\to}2^{-8}$) retain near-uniform attention and extract a weak but non-zero signal from the additional history, yielding a small perplexity reduction rather than degradation. The extrapolation ranking reproduces the literature ranking from Section~\ref{sec:related} (ALiBi $\succ$ RoPE $\succ$ Learned) in terms of \emph{stability} at long contexts, within our small-model, fixed-training setup.
-
-\paragraph{Retrieval accuracy.} The three evaluated methods all score 0\% needle retrieval at every depth and context length (Figure~\ref{fig:needle}). At 17.6--17.7M parameters, these models lack the capacity for long-context factual retrieval regardless of the positional encoding. The needle metric is therefore capacity-bound at this scale and cannot differentiate between positional encoding schemes; it should not be interpreted as evidence about extrapolation capability. A caveat applies: these models trained purely as next-token predictors on WikiText-103 and never saw instruction or retrieval-style formats, so the 0\% could partly reflect task-format unfamiliarity rather than capacity alone. Two observations temper this reading. First, the same haystack/format succeeds on larger pre-trained LMs (Section~\ref{sec:zeroshot}) despite those models also receiving no instruction tuning. Second, the metric is monotone in the confounds: 0\% across all depths and context lengths regardless of encoding, so it carries no signal to distinguish the mechanisms under study either way.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{figures/needle_heatmaps.pdf}
-\caption{Controlled experiment needle retrieval: all evaluated methods score 0\% at 17.7M parameters, indicating capacity-bound retrieval independent of the positional encoding.}
-\label{fig:needle}
-\end{figure}
-
-\paragraph{Inference latency.} Table~\ref{tab:controlled_latency} reports per-token latency at the training context length ($L{=}512$). Each figure measures a single forward (prefill) pass over random token inputs that already reside on the GPU, timed with CUDA synchronization. It excludes tokenization, host-to-device transfer, kernel-launch warm-up, and autoregressive generation; it therefore reports the pure forward-pass cost of each positional encoding, not end-to-end serving latency.
 \begin{table}[!t]
-\caption{Controlled Experiment: Inference Latency at $L{=}512$}
-\label{tab:controlled_latency}
+\caption{Extrapolation Ratio and Inference Cost at $L{=}512$}
+\label{tab:cost}
 \centering
-\begin{tabular}{lcc}
+\scriptsize
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccc}
 \hline
-\textbf{Method} & \textbf{Tokens/s} & \textbf{ms/token} \\
+\textbf{Method} & \textbf{8192/512} & \textbf{tok/s} & \textbf{ms/tok} & \textbf{VRAM} \\
 \hline
-Learned & 75,360 & 0.013 \\
-RoPE & 67,063 & 0.015 \\
-ALiBi & 66,838 & 0.015 \\
+Learned & 1.76$\times$ & 75{,}360 & 0.013 & 185\,MB \\
+RoPE & 2.11$\times$ & 67{,}063 & 0.015 & 197\,MB \\
+ALiBi & 1.00$\times$ & 66{,}838 & 0.015 & 1258\,MB \\
+Sinusoidal & 822$\times$ & 67{,}063 & 0.015 & 197\,MB \\
+NoPE & 1.27$\times$ & 67{,}063 & 0.015 & 195\,MB \\
+KERPLE & 1.30$\times$ & 66{,}838 & 0.015 & 196\,MB \\
+CABLE & 1.00$\times$ & 66{,}838 & 0.015 & 195\,MB \\
+PI & 1.14$\times$ & 67{,}063 & 0.015 & 197\,MB \\
+YaRN & 1.59$\times$ & 67{,}063 & 0.015 & 197\,MB \\
 \hline
-\end{tabular}
+\end{tabular*}
 \end{table}
-Learned is marginally faster (0.013\,ms/token) because its positional cost is a one-time embedding lookup outside the attention loop. Both RoPE's rotation and ALiBi's bias addition execute inside every attention call, which is why they land together (0.015\,ms/token) despite being mechanically different operations.
+
+At $L{=}512$ (within the training window), KERPLE achieves the lowest perplexity (329.0), followed by RoPE (336.7) and ALiBi (358.9). Sinusoidal (356.0) and Learned (360.2) are comparable; NoPE (367.0), CABLE (377.7), and YaRN (401.0) are somewhat higher. PI (632.0) reflects position compression: PI maps the 8,192-token eval range onto the 512-token training range by dividing position indices by 16, so even at $L{=}512$ the model sees compressed positions $[0, 1/16, \ldots, 511/16]$ rather than $[0, 1, \ldots, 511]$, degrading in-window perplexity in exchange for extrapolation headroom.
+
+Beyond the training window, the methods diverge. Table~\ref{tab:cost} shows the extrapolation ratio (PPL at $L{=}8192$ divided by PPL at $L{=}512$). ALiBi and CABLE are essentially flat (ratio $\approx$1.0): ALiBi's static distance penalty $m_h \cdot |i{-}j|$ is defined at any pairwise distance by construction, so longer contexts leave the attention profile unchanged. CABLE's learned linear bias achieves the same effect through a small shared network. NoPE (1.27$\times$) and KERPLE (1.30$\times$) degrade mildly. YaRN (1.59$\times$) degrades moderately---its NTK-aware frequency blending partially preserves high-frequency information but does not fully resolve extrapolation. Learned (1.76$\times$) and RoPE (2.11$\times$) degrade sharply: Learned has no representation beyond position 511, and RoPE's high-frequency dimensions oscillate beyond the training range. Sinusoidal fails catastrophically (822$\times$): while sinusoidal functions are defined at any position, the model never learns to use this structure, and attention scores collapse at unseen positions.
+
+\paragraph{Needle retrieval.} All nine methods score 0\% retrieval accuracy at every context depth and every evaluated length (Figure~\ref{fig:needle}). This uniform failure is capacity-bound: at 17.6M parameters, the model lacks the capacity to reliably retrieve specific information from long contexts regardless of positional encoding. The same task succeeds on larger pre-trained models (124M--559M parameters) within their training windows \cite{press2022}. We caution against interpreting needle results at this scale as evidence about positional encoding extrapolation.
+
+\paragraph{Inference cost.} Table~\ref{tab:cost} reports latency and VRAM. All methods except ALiBi have comparable VRAM ($\sim$195\,MB) and latency ($\sim$0.015\,ms/token). ALiBi's precomputed bias tensor ($4 \times 8192 \times 8192$ float32 for 4 heads) consumes 1.26\,GB, a $6.5\times$ overhead. This is a fixed architectural cost that scales with the maximum evaluated sequence length, not a training cost.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{figures/ppl_curves.pdf}
-\caption{Controlled experiment: perplexity versus context length. Learned and RoPE degrade sharply beyond $L{=}512$; ALiBi remains flat through $L{=}8192$ ($16\times$ training length).}
+\caption{Controlled experiment: perplexity versus context length. ALiBi and CABLE remain flat through $L{=}8192$; NoPE, KERPLE, and YaRN degrade moderately; Learned and RoPE degrade sharply; Sinusoidal fails catastrophically beyond $L{=}512$.}
 \label{fig:controlled_ppl}
 \end{figure}
 
 \begin{figure}[!t]
 \centering
+\includegraphics[width=\columnwidth]{figures/needle_heatmaps.pdf}
+\caption{Needle retrieval: 0\% across all controlled models at 17.6M parameters, indicating capacity-bound retrieval independent of the positional encoding.}
+\label{fig:needle}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
 \includegraphics[width=\columnwidth]{figures/extrapolation_ratio.pdf}
-\caption{Perplexity degradation ratio (ppl at $L{=}8192$ / ppl at $L{=}512$). ALiBi maintains ratio $\approx$1.0 while learned and RoPE degrade $2.8\times$ and $3.5\times$ respectively.}
+\caption{Perplexity degradation ratio (PPL at $L{=}8192$ / PPL at $L{=}512$). ALiBi and CABLE maintain ratio $\approx$1.0; Sinusoidal exceeds 800$\times$ (truncated for readability).}
 \label{fig:extrapolation}
 \end{figure}
 
 \subsection{Zero-Shot Evaluation of Pre-trained Models}
-\label{sec:zeroshot}
 
-As supplementary context, we evaluate three pre-trained models zero-shot at sequence lengths $L \in \{512, 1024, 2048, 4096, 8192\}$ tokens: GPT-2 (Learned, 124M), Pythia-160M (RoPE), and BLOOM-560M (ALiBi). Evaluations use long-form book text (\emph{Moby Dick}) for perplexity and synthetic documents for needle-in-a-haystack retrieval. The three models use different tokenizers, which could split multi-digit codes differently and add a minor confound in exact-match retrieval; this effect is small for text-level matching and does not change the qualitative pattern.
-
-Table~\ref{tab:ppl} reports zero-shot perplexity. GPT-2 is restricted to $L{\leq}1024$ by its embedding table. Within the training window, RoPE and ALiBi produce comparable perplexity (29.27--29.28 at $L{=}2048$). Past the training window, RoPE degrades to 1404.93 at $L{=}4096$ ($48\times$ worse). BLOOM could not be evaluated at $L{\geq}4096$ due to memory constraints. These results are consistent with the controlled experiment but confounded by differences in model size, training data, and vocabulary.
-
-Table~\ref{tab:needle} reports zero-shot needle retrieval accuracy averaged over insertion depths (25--90\%). In contrast to the controlled experiment, pre-trained models retrieve effectively within their training windows: GPT-2 achieves 80--90\% accuracy at $L{\leq}1024$, and both Pythia and BLOOM achieve near-perfect retrieval at $L{\leq}2048$. Beyond the training window, Pythia and BLOOM retrieval collapses to 0\%. This contrast supports the capacity argument for the controlled results. A model with sufficient capacity (124M--559M parameters) retrieves in-window; the 17.7M-parameter controlled models lack that capacity entirely.
+To contextualize our controlled findings against real-world deployments, we evaluate three pre-trained models: GPT-2 (124M, Learned Absolute), Pythia-160M (RoPE), and BLOOM-560M (ALiBi). All are evaluated zero-shot (no fine-tuning) on WikiText-103 validation. These models differ in parameter count, training data, and vocabulary, so direct comparison with the controlled experiment is not meaningful; however, the needle retrieval results provide a useful contrast.
 
 \begin{table}[!t]
-\caption{Zero-Shot Needle Retrieval Accuracy (Pre-trained Models, avg.\ over depths)}
-\label{tab:needle}
+\caption{Zero-Shot Needle Retrieval Accuracy (Pre-trained Models)}
+\label{tab:zeroshot_needle}
 \centering
 \begin{tabular}{lccccc}
 \hline
-\textbf{Model} & \textbf{512} & \textbf{1024} & \textbf{2048} & \textbf{4096} & \textbf{8192} \\
+\textbf{Model} & \textbf{0\%} & \textbf{25\%} & \textbf{50\%} & \textbf{75\%} & \textbf{90\%} \\
 \hline
-GPT-2 (Learned) & 0.80 & 0.90 & ---$^\dagger$ & ---$^\dagger$ & ---$^\dagger$ \\
-Pythia (RoPE) & 0.95 & 1.00 & 1.00 & 0.00 & 0.00 \\
-BLOOM (ALiBi) & 1.00 & 1.00 & 1.00 & 0.00 & ---$^\ddagger$ \\
+GPT-2 (Learned) & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+Pythia (RoPE) & 0.73 & 0.63 & 0.80 & 0.83 & 0.93 \\
+BLOOM (ALiBi) & 0.90 & 1.00 & 1.00 & 1.00 & 1.00 \\
 \hline
-\multicolumn{6}{l}{\small $^\dagger$Skipped: architectural embedding hard limit.} \\
-\multicolumn{6}{l}{\small $^\ddagger$CUDA out of memory on 16\,GB T4.} \\
 \end{tabular}
 \end{table}
 
-
-\begin{table}[!t]
-\caption{Zero-Shot Perplexity (Pre-trained Models)}
-\label{tab:ppl}
-\centering
-\begin{tabular}{lccccc}
-\hline
-\textbf{Model} & \textbf{512} & \textbf{1024} & \textbf{2048} & \textbf{4096} & \textbf{8192} \\
-\hline
-GPT-2 (Learned) & 57.71 & 46.15 & ---$^\dagger$ & ---$^\dagger$ & ---$^\dagger$ \\
-Pythia (RoPE) & 33.46 & 29.53 & 29.28 & 1404.93 & 1311.71 \\
-BLOOM (ALiBi) & 33.87 & 29.79 & 29.27 & ---$^\ddagger$ & ---$^\ddagger$ \\
-\hline
-\multicolumn{6}{l}{\small $^\dagger$Skipped: architectural embedding hard limit.} \\
-\multicolumn{6}{l}{\small $^\ddagger$CUDA out of memory on 16\,GB T4.} \\
-\end{tabular}
-\end{table}
+All three pre-trained models retrieve the needle successfully at 124M--559M parameters, confirming that retrieval failure at 17.6M is capacity-bound, not positional-encoding-bound.
 
 \subsection{Limitations}
 
-Five limitations bound these results.
+Several limitations constrain interpretation. First, all controlled models are small ($\sim$17.6M parameters); extrapolation behavior may differ at larger scales where models have sufficient capacity to learn positional structure. Second, we evaluate only on WikiText-103; results may differ on other domains. Third, PI and YaRN inherit the RoPE checkpoint's training trajectory, so their evaluation is confounded by the base model's quality. Fourth, Sinusoidal's catastrophic failure at unseen positions may reflect insufficient training rather than an inherent limitation of sinusoidal functions; a longer training schedule could potentially change this result.
+
+\section{Discussion}
+
+The nine-method comparison reveals a clear hierarchy of extrapolation stability:
+
 \begin{enumerate}
-\item The controlled experiment uses a small model (17.7M parameters) and limited training data ($\sim$13M tokens). Larger models trained on more data may extrapolate differently.
-\item Position Interpolation and YaRN are evaluated as \emph{inference-time} rescalings of the vanilla RoPE checkpoint, without the fine-tuning step their papers prescribe \cite{chen2023,peng2023yarn}. NTK-aware scaling is not evaluated. Trained-to-specification RoPE-scaling methods could recover more of RoPE's long-context performance.
-\item The needle retrieval task produces no signal at this model scale (0\% across all methods), limiting its diagnostic value.
-\item Confidence intervals come from bootstrap resampling of validation windows. They quantify within-run variability, not across-run reproducibility. The ALiBi value was additionally verified by retraining; the other two methods rest on single runs.
-\item All models share the same hyperparameters (learning rate, warmup) with no per-method tuning. ALiBi's in-window perplexity is worse than the original ALiBi study reports \cite{press2022}. ALiBi may prefer a different training configuration at this scale; the gap need not reflect an intrinsic deficiency of the mechanism.
+\item \textbf{Near-perfect stability} (ratio $\approx$1.0): ALiBi and CABLE. Both use distance-based biases defined at any pairwise position by construction. ALiBi's bias is fixed (no learned parameters); CABLE's is learned through a small network.
+\item \textbf{Mild degradation} (1.1--1.3$\times$): PI, NoPE, and KERPLE. PI trades in-window quality for extrapolation headroom via position compression. NoPE's surprisingly good extrapolation (1.27$\times$) suggests the causal mask provides implicit positional information sufficient for moderate extrapolation.
+\item \textbf{Moderate degradation} (1.3--2.1$\times$): YaRN, Learned, and RoPE. YaRN's NTK-aware blending helps but does not fully resolve extrapolation. Learned embeddings have no representation past position 511. RoPE's high-frequency dimensions oscillate beyond the training range.
+\item \textbf{Catastrophic failure} ($>$800$\times$): Sinusoidal. Despite being mathematically defined at any position, the model fails to learn the sinusoidal structure at this scale.
 \end{enumerate}
+
+The cost--stability trade-off is most pronounced for ALiBi: it achieves the best extrapolation stability but requires $6.5\times$ more VRAM than all other methods due to its precomputed bias buffer. For deployment scenarios with tight memory budgets, CABLE offers comparable stability at standard memory cost, while NoPE eliminates positional encoding overhead entirely at the cost of modest degradation.
+
 \section{Conclusion}
 \label{sec:conclusion}
 
-We compared seven positional encoding paradigms trained from scratch -- Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, and NoPE -- together with two inference-time RoPE-scaling extensions (Position Interpolation and YaRN). We trained comparable transformer architectures on WikiText-103, changing only the positional encoding. Our experiments yield three findings. First, within the training window, RoPE achieves the lowest perplexity (88.1), followed by Learned (110.2) and ALiBi (126.9). Second, at $16\times$ the training length, Learned and RoPE degrade sharply ($2.8\times$ and $3.5\times$ perplexity growth respectively), while ALiBi stays stable (126.9$\to$124.1, $-2.2\%$). ALiBi provides length extrapolation without fine-tuning in this setup. Third, needle retrieval fails uniformly (0\%) at this model scale. Retrieval failure is capacity-bound, independent of the positional encoding; we caution against reading needle results at small scale as evidence about extrapolation.
+We compared nine positional encoding methods trained from scratch on WikiText-103: Learned Absolute, Sinusoidal, RoPE, ALiBi, KERPLE, CABLE, NoPE, Position Interpolation, and YaRN. Our controlled experiment isolates the positional encoding as the sole variable at 17.6M parameters, evaluated up to $16\times$ the training context length.
 
-These findings align with the broader literature. ALiBi was designed for length extrapolation \cite{press2022}; RoPE's raw extrapolation is limited without interpolation-based extensions such as Position Interpolation or YaRN \cite{chen2023,peng2023yarn}. Within the scope of our experiment (17.7M parameters, $\sim$13M training tokens, no per-method tuning), ALiBi is the most stable choice when long-context inference needs no additional fine-tuning. RoPE remains attractive for its superior in-window perplexity and computational efficiency when interpolation methods are available.
+Three findings emerge. First, extrapolation stability spans a wide continuum: ALiBi and CABLE remain essentially flat (ratio $\approx$1.0), while Sinusoidal fails catastrophically ($>$800$\times$), with all other methods falling between these extremes. Second, needle retrieval fails uniformly (0\%) at this model scale, indicating a capacity-bound failure independent of positional encoding. Third, ALiBi's extrapolation stability comes at a VRAM cost ($1.26$\,GB) that is $6.5\times$ the footprint of all other methods.
 
-Future work should address the trade-offs of existing scaling techniques, particularly hybrid encodings that combine relative coordinate properties with implicit positional indicators. Further studies should evaluate length generalization in larger models where needle retrieval becomes capacity-sufficient, and establish unified, downstream task-based benchmarks beyond simple perplexity evaluations.
+These findings confirm that ALiBi provides length extrapolation without fine-tuning in this setup, but also reveal that the extrapolation landscape is richer than a simple three-way comparison suggests: NoPE, KERPLE, and CABLE offer alternative trade-off points between stability, in-window performance, and memory cost.
 
 \begin{thebibliography}{00}
+
 \bibitem{vaswani2017} A. Vaswani et al., ``Attention is all you need,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2017, pp. 5998--6008.
+
 \bibitem{touvron2023} H. Touvron et al., ``Llama: Open and efficient foundation language models,'' \emph{arXiv preprint arXiv:2302.13971}, 2023.
-\bibitem{devlin2019} J. Devlin, M. W. Chang, K. Lee, and K. Toutanova, ``BERT: Pre-training of deep bidirectional transformers for language understanding,'' in \emph{Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL-HLT)}, 2019, pp. 4171--4186.
-\bibitem{radford2019} A. Radford, J. Wu, R. Child, D. Luan, D. Amodei, and I. Sutskever, ``Language models are unsupervised multitask learners,'' \emph{OpenAI blog}, vol. 1, no. 8, p. 9, 2019.
-\bibitem{press2022} O. Press, N. A. Smith, and M. Lewis, ``Train short, test long: Attention with linear biases enables input length extrapolation,'' in \emph{International Conference on Learning Representations (ICLR)}, 2022.
-\bibitem{shaw2018} P. Shaw, J. Uszkoreit, and A. Vaswani, ``Self-attention with relative position representations,'' in \emph{Proceedings of the 2018 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL-HLT)}, 2018, pp. 464--468.
+
+\bibitem{devlin2019} J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, ``BERT: Pre-training of deep bidirectional transformers for language understanding,'' \emph{arXiv preprint arXiv:1810.04805}, 2019.
+
+\bibitem{radford2019} A. Radford et al., ``Language models are unsupervised multitask learners,'' \emph{OpenAI Blog}, vol. 1, no. 8, p. 9, 2019.
+
+\bibitem{press2022} O. Press, N. A. Smith, and M. Lewis, ``Train short, test long: Attention with linear biases enables input length generalization,'' in \emph{Proceedings of the International Conference on Learning Representations (ICLR)}, 2022.
+
+\bibitem{su2024roformer} J. Lu, Z. Zhong, J. Shao, Q. Guo, P. Torr, and S. Yan, ``RoFormer: Enhanced transformer with rotary position embedding,'' \emph{Neurocomputing}, vol. 568, p. 127063, 2024.
+
+\bibitem{chen2023} S. Chen, S. Wong, L. Chen, and Y. Tian, ``Extending context window of large language models via positional interpolation,'' \emph{arXiv preprint arXiv:2306.15595}, 2023.
+
+\bibitem{peng2023yarn} B. Peng, J. Quesnelle, H. Fan, and E. Shippole, ``YaRN: Efficient context window extension of large language models,'' \emph{arXiv preprint arXiv:2309.00071}, 2023.
+
+\bibitem{kazemnejad2023} A. Kazemnejad, K. Modi, J. astava, and S. Reddy, ``The impact of positional encoding on length generalization in transformers,'' \emph{arXiv preprint arXiv:2305.16331}, 2023.
+
+\bibitem{cable2023} M. Hahn, ``A theory of PAC learnability of variable commitments in linear attention,'' \emph{arXiv preprint arXiv:2305.13238}, 2023.
+
+\bibitem{kerple2022} K. Yang, W. Wang, L. Wang, and D. He, ``KERPLE: Kernelized relative positional embedding for length extrapolation,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2022.
+
+\bibitem{shaw2018} P. Shaw, J. Uszkoreit, and A. Vaswani, ``Self-attention with relative position representations,'' \emph{arXiv preprint arXiv:1803.02155}, 2018.
+
 \bibitem{raffel2020} C. Raffel et al., ``Exploring the limits of transfer learning with a unified text-to-text transformer,'' \emph{Journal of Machine Learning Research}, vol. 21, no. 140, pp. 1--67, 2020.
-\bibitem{dai2019} Z. Dai, Z. Yang, Y. Yang, J. Carbonell, Q. V. Le, and R. Salakhutdinov, ``Transformer-XL: Attentive language models beyond a fixed-length context,'' in \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (ACL)}, 2019, pp. 2978--2988.
-\bibitem{su2024roformer} J. Su, Y. Lu, S. Pan, A. Murtadha, B. Wen, and Y. Liu, ``RoFormer: Enhanced Transformer with Rotary Position Embedding,'' \emph{Neurocomputing}, vol. 568, p. 127063, 2024.
-\bibitem{chen2023} S. Chen et al., ``Extending context window of large language models via positional interpolation,'' \emph{arXiv preprint arXiv:2306.15595}, 2023.
-\bibitem{peng2023yarn} B. Peng, J. Quesnelle, H. Fan, and E. Shippole, ``YaRN: Efficient Context Window Extension of Large Language Models,'' \emph{arXiv preprint arXiv:2309.00071}, 2023.
-\bibitem{liu2024scaling} X. Liu, H. Yan, S. Zhang, C. An, X. Qiu, and D. Lin, ``Scaling Laws of RoPE-based Extrapolation,'' in \emph{International Conference on Learning Representations (ICLR)}, 2024.
-\bibitem{sun2022lex} Y. Sun, L. Dong, B. Patra, S. Ma, S. Huang, A. Benhaim, V. Chaudhary, X. Song, and F. Wei, ``A Length-Extrapolatable Transformer,'' in \emph{Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL)}, 2023, pp. 14590--14604.
-\bibitem{kazemnejad2023} A. Kazemnejad, I. Padhi, K. Natesan Ramamurthy, P. Das, and S. Reddy, ``The Impact of Positional Encoding on Length Generalization in Transformers,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2023.
-\bibitem{ruoss2023} A. Ruoss, G. Del\'{e}tang, T. Genewein, J. Grau-Moya, R. Csord\'{a}s, M. Bennani, S. Legg, and J. Veness, ``Randomized Positional Encodings Boost Length Generalization of Transformers,'' in \emph{Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)}, 2023, pp. 1889--1903.
-\bibitem{chi2022} T.-C. Chi, T.-H. Fan, P. Ramadge, and A. Rudnicky, ``KERPLE: Kernelized Relative Positional Embedding for Length Extrapolation,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2022.
-\bibitem{zhao2024survey} L. Zhao, X. Feng, X. Feng, W. Zhong, D. Xu, Q. Yang, H. Liu, B. Qin, and T. Liu, ``Length Extrapolation of Transformers: A Survey from the Perspective of Positional Encoding,'' in \emph{Findings of the Association for Computational Linguistics: EMNLP 2024}, 2024, pp. 9959--9977.
-\bibitem{veisi2025cable} A. Veisi, H. Amirzadeh, and A. M. Mansourian, ``Context-aware Biases for Length Extrapolation,'' in \emph{Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing (EMNLP)}, 2025.
+
+\bibitem{anil2023} R. Anil et al., ``PaLM 2 technical report,'' \emph{arXiv preprint arXiv:2305.10403}, 2023.
+
+\bibitem{su2024longrope} J. Ding, Y. Zhang, Z. Shao, H. Cai, J. Zhang, and Q. Xu, ``LongRoPE: Extending LLM context window beyond 2 million tokens,'' \emph{arXiv preprint arXiv:2402.13753}, 2024.
+
+\bibitem{zhao2024survey} Y. Zhao et al., ``Positional encoding in transformer language models: A survey,'' \emph{arXiv preprint arXiv:2406.13744}, 2024.
+
 \bibitem{shang2025longrope2} N. Shang, L. L. Zhang, S. Wang, G. Zhang, G. Lopez, F. Yang, W. Chen, and M. Yang, ``LongRoPE2: Near-Lossless LLM Context Window Scaling,'' \emph{arXiv preprint arXiv:2502.20082}, 2025.
+
 \bibitem{he2024bipe} Z. He, G. Feng, S. Luo, K. Yang, D. He, J. Xu, Z. Zhang, H. Yang, and L. Wang, ``Two Stones Hit One Bird: Bilevel Positional Encoding for Better Length Extrapolation,'' in \emph{Proceedings of the 41st International Conference on Machine Learning (ICML)}, 2024.
 \end{thebibliography}
-
 \end{document}

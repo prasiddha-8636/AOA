@@ -11,10 +11,12 @@ def _precompute_freqs(d_head, max_seq_len, base=10000.0):
     return freqs
 
 
-def _apply_rotate(x, freqs):
+def _apply_rotate(x, freqs, base=10000.0):
     B, H, L, D = x.shape
     x_reshaped = x.float().reshape(B, H, L, D // 2, 2)
     x_complex = torch.view_as_complex(x_reshaped)
+    if L > freqs.shape[0]:
+        freqs = _precompute_freqs(D, L, base)
     freqs = freqs[:L, :].to(x.device)
     freqs_complex = torch.polar(torch.ones_like(freqs), freqs)
     freqs_complex = freqs_complex.view(1, 1, L, D // 2)
@@ -23,10 +25,16 @@ def _apply_rotate(x, freqs):
     return x_out.to(x.dtype)
 
 
-def _apply_rotate_with_scale(x, freqs, scale):
+def _apply_rotate_with_scale(x, freqs, scale, base=10000.0):
     B, H, L, D = x.shape
     x_reshaped = x.float().reshape(B, H, L, D // 2, 2)
     x_complex = torch.view_as_complex(x_reshaped)
+    if L > freqs.shape[0]:
+        freqs = _precompute_freqs(D, L, base)
+    if scale.shape[0] < L:
+        raise ValueError(
+            f"scale buffer too small ({scale.shape[0]}) for sequence length {L}"
+        )
     freqs_scaled = freqs[:L, :] * scale[:L, :]
     freqs_complex = torch.polar(torch.ones_like(freqs_scaled), freqs_scaled)
     freqs_complex = freqs_complex.view(1, 1, L, D // 2).to(x.device)

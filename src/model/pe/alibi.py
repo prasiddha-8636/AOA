@@ -24,8 +24,16 @@ class AlibiPositionalEncoding(PositionalEncoding):
         bias = -slopes.view(1, -1, 1, 1) * pos
         return bias
 
+    def _grow(self, L, device):
+        """Grow the cached bias matrix on demand (needle generation reaches
+        L=8193, one past the eval max)."""
+        slopes = self._compute_slopes(self.n_heads)
+        self.bias = self._build_alibi_bias(L, slopes)
+
     def forward(self, x, past_length=0):
         return x  # ALiBi bias is added during attention
 
     def get_bias(self, L, device):
+        if L > self.bias.shape[2]:
+            self._grow(L, device)
         return self.bias[:, :, :L, :L].to(device)

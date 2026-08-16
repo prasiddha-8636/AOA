@@ -24,6 +24,7 @@ class LearnedPositionalEncoding(PositionalEncoding):
 class SinusoidalPositionalEncoding(PositionalEncoding):
     def __init__(self, d_model, n_heads, max_seq_len):
         super().__init__()
+        self.d_model = d_model
         self.max_eval_len = 8192  # max length we evaluate at
         pe = self._build_pe(self.max_eval_len, d_model)
         self.register_buffer("pe", pe)
@@ -38,7 +39,15 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
         pe[:, 1::2] = torch.cos(position * div_term)
         return pe
 
+    def _grow(self, L, device):
+        """Grow the cached table to L rows on demand (needle generation reaches
+        L=8193, one past the eval max)."""
+        extra = self._build_pe(L - self.pe.shape[0], self.d_model)
+        self.pe = torch.cat([self.pe, extra], dim=0)
+
     def forward(self, x, past_length=0):
         B, L, D = x.shape
         device = x.device
-        return x + self.pe[past_length:past_length + L, :].to(device)
+        if past_length + L > self.pe.shape[0]:
+            self._grow(past_length + L, device)
+        return x + self.pe[past_length : past_length + L, :].to(device)

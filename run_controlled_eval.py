@@ -197,14 +197,15 @@ def main():
 
     os.makedirs("results", exist_ok=True)
     out_name = (
-        "results/controlled_results.json"
+        "controlled_results.json"
         if methods == ["learned", "rope", "alibi"]
-        else f"results/controlled_results_{'_'.join(methods)}.json"
+        else f"controlled_results_{'_'.join(methods)}.json"
     )
-    out_name = persist_path("results", out_name)
-    with open(out_name, "w") as f:
+    results_dir = persist_path("results", "results")
+    out_path = os.path.join(results_dir, out_name)
+    with open(out_path, "w") as f:
         json.dump(out, f, indent=2)
-    print(f"\nSaved {out_name}")
+    print(f"\nSaved {out_path}")
 
 
 if __name__ == "__main__":
